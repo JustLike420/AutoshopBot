@@ -2,7 +2,7 @@
 import json
 import random
 import time
-from yoomoney import Quickpay, Client
+
 import requests
 from aiogram import types
 from aiogram.dispatcher import FSMContext
@@ -12,15 +12,15 @@ from pyqiwip2p import QiwiP2P
 from keyboards.default import all_back_to_main_default, check_user_out_func
 from keyboards.inline import *
 from loader import dp, bot
-from states.state_payment import StorageQiwi, StorageYooMoney
+from states.state_payment import StorageQiwi
 from utils import send_all_admin, clear_firstname, get_dates
-from utils.db_api.sqlite import update_userx, get_refillx, add_refillx, get_yoomoney
+from utils.db_api.sqlite import update_userx, get_refillx, add_refillx
 
 
 ###################################################################################
 ############################## ВВОД СУММЫ ПОПОЛНЕНИЯ ##############################
 # Выбор способа пополнения
-@dp.callback_query_handler(text="qiwi_paym", state="*")
+@dp.callback_query_handler(text="user_input", state="*")
 async def input_amount(call: CallbackQuery, state: FSMContext):
     check_pass = False
     get_payment = get_paymentx()
@@ -56,108 +56,6 @@ async def input_amount(call: CallbackQuery, state: FSMContext):
                 f"<b>❌ QIWI кошелёк недоступен. Срочно замените его.</b>")
     else:
         await bot.answer_callback_query(call.id, "❗ Пополнения в боте временно отключены")
-
-
-@dp.callback_query_handler(text="yoo_paym", state="*")
-async def input_amount_yoo(call: CallbackQuery, state: FSMContext):
-    get_payment = get_yoomoney()
-    if get_payment[3] == "True":
-        await StorageYooMoney.here_input_yoo_amount.set()
-        await bot.delete_message(call.from_user.id, call.message.message_id)
-        await call.message.answer("<b>💵 Введите сумму для пополнения средств 🥝</b>",
-                                  reply_markup=all_back_to_main_default)
-
-    else:
-        await bot.answer_callback_query(call.id, "❗ Пополнение временно недоступно")
-        await send_all_admin(
-            f"👤 Пользователь <a href='tg://user?id={call.from_user.id}'>{clear_firstname(call.from_user.first_name)}</a> "
-            f"пытался пополнить баланс через YooMoney.")
-
-
-@dp.message_handler(state=StorageYooMoney.here_input_yoo_amount)
-async def create_yoo_pay(message: types.Message, state: FSMContext):
-    if message.text.isdigit() and int(message.text) >= 2:
-        amount = int(message.text)
-        del_msg = await bot.send_message(message.from_user.id, "<b>♻ Подождите, платёж генерируется...</b>")
-        comment = str(random.randint(100000000000, 999999999999))
-        yoomoney_data = get_yoomoney()
-        payment_form = dict()
-        payment_form["name"] = "пополнение"
-        quick_pay = Quickpay(
-            receiver=yoomoney_data[1],
-            quickpay_form="shop",
-            targets="Пополнение баланса",
-            paymentType="SB",
-            sum=amount,
-            label=comment
-        )
-
-        payment_form["link"] = quick_pay.base_url
-        payment_form["key"] = "Номер"
-        payment_form["value"] = yoomoney_data[1]
-        await bot.delete_message(message.chat.id, del_msg.message_id)
-        delete_msg = await message.answer("🥝 <b>Платёж был создан.</b>",
-                                          reply_markup=check_user_out_func(message.from_user.id))
-        send_message = "❗️ Для оплаты <b>необходимо перейти по ссылке, где все данные указаны автоматически</b>️\n" \
-                       "Вам необходимо только нажать <b>Оплатить</b> ❗️\n"
-
-        await message.answer(send_message,
-                             reply_markup=create_pay_yoo_func(payment_form["link"], comment,
-                                                              message_id=delete_msg.message_id, way='yoo'))
-        await state.finish()
-    else:
-        await StorageYooMoney.here_input_yoo_amount.set()
-        await message.answer("<b>❌ Данные были введены неверно.</b>\n"
-                             "💵 Введите сумму для пополнения средств (min 2rub)")
-
-
-@dp.callback_query_handler(text_startswith="Pay:yoo:")
-async def check_yoo_pay(call: CallbackQuery):
-    print(call.data)
-    comment = call.data.split(":")[2]
-    message_id = call.data.split(":")[3]
-    yoomoney_data = get_yoomoney()
-    client = Client(yoomoney_data[2])
-    history = client.operation_history(label=comment)
-    success = False
-    get_user_info = get_userx(user_id=call.from_user.id)
-
-    for operation in history.operations:
-        comment_payment = str(operation.label)
-        if comment_payment == comment:
-            success = True
-            await bot.delete_message(call.message.chat.id, message_id)
-            await call.message.delete()
-            amount = operation.amount  # сумма пополнения
-            add_refillx(call.from_user.id, call.from_user.username, call.from_user.first_name, comment,
-                        amount, comment, "Yoo", get_dates(),
-                        int(time.time()))
-            update_userx(call.from_user.id,
-                         balance=int(get_user_info[4]) + amount,
-                         all_refill=int(get_user_info[5]) + amount)
-            await call.message.answer(f"<b>✅ Вы успешно пополнили баланс на сумму {amount}руб Удачи ❤</b>\n"
-                                      f"<b>📃 Чек:</b> <code>+{comment}</code>",
-                                      reply_markup=check_user_out_func(call.from_user.id))
-            await send_all_admin(f"<b>💰 Пользователь</b> "
-                                 f"(@{call.from_user.username}|<a href='tg://user?id={call.from_user.id}'>{call.from_user.first_name}</a>"
-                                 f"|<code>{call.from_user.id}</code>) "
-                                 f"<b>пополнил баланс на сумму</b> <code>{amount}руб</code> 🥝\n"
-                                 f"📃 <b>Чек:</b> <code>+{comment}</code>")
-    if success is False:
-        await call.answer("Платеж не найден.")
-
-    return False
-
-
-@dp.callback_query_handler(text="user_input_payment", state="*")
-async def input_payment(call: CallbackQuery):
-    await bot.delete_message(call.from_user.id, call.message.message_id)
-    markup = InlineKeyboardMarkup()
-    markup.add(InlineKeyboardButton(text="Qiwi", callback_data="qiwi_paym"))
-    markup.add(InlineKeyboardButton(text="YooMoney",
-                                    callback_data="yoo_paym"))
-    await call.message.answer("<b>Выбери способ оплаты:</b>",
-                              reply_markup=markup)
 
 
 ###################################################################################

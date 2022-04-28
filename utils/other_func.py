@@ -6,7 +6,7 @@ from aiogram import Dispatcher
 from data.config import admins, bot_description
 from loader import bot
 from utils.db_api.sqlite import get_settingsx, update_settingsx
-from requests import post
+
 
 # Уведомление и проверка обновления при запуске скрипта
 async def on_startup_notify(dp: Dispatcher):
@@ -44,35 +44,3 @@ def clear_firstname(firstname):
 # Получение текущей даты
 def get_dates():
     return datetime.datetime.today().replace(microsecond=0)
-
-def yoomoney_auth(client_id, redirect_uri):
-
-    data = {
-        'client_id': client_id,
-        'response_type': 'code',
-        'redirect_uri': redirect_uri,
-        'scope': 'account-info operation-history operation-details'
-    }
-
-    response = post("http://yoomoney.ru/oauth/authorize", params=data)
-
-    return response.url
-
-def generate_token(client_id, redirect_uri, url):
-
-    url_split = url.split("?")
-    auth_code = url_split[1].split("=")[1]
-
-    auth = {
-        'code': auth_code,
-        'client_id': client_id,
-        'grant_type': 'authorization_code',
-        'redirect_uri': redirect_uri,
-    }
-
-    response = post("http://yoomoney.ru/oauth/token", params=auth)
-
-    if response.status_code == 200:
-        return response.json()["access_token"]
-    else:
-        return None

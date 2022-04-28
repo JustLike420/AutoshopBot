@@ -119,23 +119,6 @@ def get_paymentx():
     return get_response
 
 
-# Изменить yoomoney
-def edit_yoomoney(yoomoney_data: dict):
-    with sqlite3.connect(path_to_db) as db:
-        cur = db.cursor()
-        cur.execute("UPDATE YooMoney SET num = ? , token = ? WHERE id = ?",
-                    (yoomoney_data['num'], yoomoney_data['token'], 1))
-def get_yoomoney():
-    with sqlite3.connect(path_to_db) as db:
-        cur = db.cursor()
-        return cur.execute("SELECT * FROM YooMoney").fetchone()
-
-def update_paymenty(**kwargs):
-    with sqlite3.connect(path_to_db) as db:
-        sql = f"UPDATE YooMoney SET XXX "
-        sql, parameters = update_format_with_args(sql, kwargs)
-        db.execute(sql, parameters)
-        db.commit()
 # Изменение платежных систем
 def update_paymentx(**kwargs):
     with sqlite3.connect(path_to_db) as db:
@@ -608,13 +591,4 @@ def create_bdx():
                        "balance_before TEXT, balance_after TEXT, "
                        "buy_date TIMESTAMP, buy_date_unix TEXT)")
             print("DB was not found(8/8) | Creating...")
-        db.execute("CREATE TABLE IF NOT EXISTS YooMoney ("
-                   "id INTEGER PRIMARY KEY AUTOINCREMENT, "
-                   "num TEXT,"
-                   "token TEXT,"
-                   "status TEXT)")
-
-        if len(db.execute("SELECT * FROM YooMoney").fetchall()) == 0:
-            db.execute("INSERT INTO YooMoney (num, token) VALUES (?, ?)",
-                       ("num", "token"))
         db.commit()
