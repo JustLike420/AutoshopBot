@@ -13,3 +13,8 @@ class StorageYooMoney(StatesGroup):
     redirect_uri = State()
     authorize = State()
     here_input_yoo_amount = State()
+
+class StorageCrystalPay(StatesGroup):
+    name = State()
+    secret = State()
+    here_input_crystal_amount = State()

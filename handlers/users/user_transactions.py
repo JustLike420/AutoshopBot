@@ -12,9 +12,10 @@ from pyqiwip2p import QiwiP2P
 from keyboards.default import all_back_to_main_default, check_user_out_func
 from keyboards.inline import *
 from loader import dp, bot
-from states.state_payment import StorageQiwi, StorageYooMoney
+from states.state_payment import StorageQiwi, StorageYooMoney, StorageCrystalPay
+from external.pycrystalpay import CrystalPay
 from utils import send_all_admin, clear_firstname, get_dates
-from utils.db_api.sqlite import update_userx, get_refillx, add_refillx, get_yoomoney
+from utils.db_api.sqlite import update_userx, get_refillx, add_refillx, get_yoomoney, get_crystal
 
 
 ###################################################################################
@@ -156,10 +157,90 @@ async def input_payment(call: CallbackQuery):
     markup.add(InlineKeyboardButton(text="Qiwi", callback_data="qiwi_paym"))
     markup.add(InlineKeyboardButton(text="YooMoney",
                                     callback_data="yoo_paym"))
+    markup.add(InlineKeyboardButton(text="CrystalPay", callback_data="crystal_paym"))
     await call.message.answer("<b>Выбери способ оплаты:</b>",
                               reply_markup=markup)
 
 
+###################################################################################
+####################################### CRYSTAL ###################################
+@dp.callback_query_handler(text="crystal_paym", state="*")
+async def input_amount_yoo(call: CallbackQuery, state: FSMContext):
+    get_payment = get_crystal()
+    if get_payment[3] == "True":
+        await StorageCrystalPay.here_input_crystal_amount.set()
+        await bot.delete_message(call.from_user.id, call.message.message_id)
+        await call.message.answer("<b>💵 Введите сумму для пополнения средств 🥝</b>",
+                                  reply_markup=all_back_to_main_default)
+
+    else:
+        await bot.answer_callback_query(call.id, "❗ Пополнение временно недоступно")
+        await send_all_admin(
+            f"👤 Пользователь <a href='tg://user?id={call.from_user.id}'>{clear_firstname(call.from_user.first_name)}</a> "
+            f"пытался пополнить баланс через CrystalPay.")
+
+
+@dp.message_handler(state=StorageCrystalPay.here_input_crystal_amount)
+async def create_crystal_pay(message: types.Message, state: FSMContext):
+    if message.text.isdigit() and int(message.text) >= 2:
+        amount = int(message.text)
+        crystal_data = get_crystal()
+        print(crystal_data)
+        del_msg = await bot.send_message(message.from_user.id, "<b>♻ Подождите, платёж генерируется...</b>")
+        crystal = CrystalPay(crystal_data[1], crystal_data[2])
+        link = crystal.generate_pay_link(message.text)
+        await bot.delete_message(message.chat.id, del_msg.message_id)
+        delete_msg = await message.answer("🥝 <b>Платёж был создан.</b>",
+                                          reply_markup=check_user_out_func(message.from_user.id))
+        await message.answer("🎈 Ссылка на оплату сгенерирована:\n"
+                             f"✔ ID платежа: {link[0]}\n"
+                             f"📎 Ссылка: <a href='{link[1]}'>нажмите для пополнения счёта</a>",
+                             reply_markup=create_pay_crystal_func(send_requests=link[1], receipt=link[0],
+                                                                  message_id=message.message_id, way="Crystal"))
+        await state.finish()
+    else:
+        await StorageCrystalPay.here_input_crystal_amount.set()
+        await message.answer("<b>❌ Данные были введены неверно.</b>\n"
+                             "💵 Введите сумму для пополнения средств (min 2rub)")
+
+@dp.callback_query_handler(text_startswith="Pay:Crystal:")
+async def check_crystal_pay(call: CallbackQuery):
+    call_data = call.data.split(":")
+    receipt = call_data[2]
+    message_id = call_data[3]
+    way_pay = call_data[1]
+    crystal = CrystalPay('testererwerer', 'ba225fd21701497d91e70ed41333914448a1afd0')
+    status = crystal.get_pay_status(receipt)
+    pay_amount = status[1]
+    # get_payments = get_paymentx()
+    get_user_info = get_userx(user_id=call.from_user.id)
+    pay_status = status[0]
+    if pay_status:
+        get_purchase = get_refillx("*", receipt=receipt)
+        if get_purchase is None:
+            add_refillx(call.from_user.id, call.from_user.username, call.from_user.first_name, receipt,
+                        pay_amount, receipt, way_pay, get_dates(), int(time.time()))
+
+            # Обновление баланса у пользователя
+            update_userx(call.from_user.id,
+                         balance=int(get_user_info[4]) + pay_amount,
+                         all_refill=int(get_user_info[5]) + pay_amount)
+
+            await bot.delete_message(call.message.chat.id, message_id)
+            await call.message.delete()
+            await call.message.answer(
+                f"<b>✅ Вы успешно пополнили баланс на сумму {pay_amount}руб. Удачи ❤</b>\n"
+                f"<b>📃 Чек:</b> <code>+{receipt}</code>",
+                reply_markup=check_user_out_func(call.from_user.id))
+            await send_all_admin(f"<b>💰 Пользователь</b> "
+                                 f"(@{call.from_user.username}|<a href='tg://user?id={call.from_user.id}'>{call.from_user.first_name}</a>"
+                                 f"|<code>{call.from_user.id}</code>) "
+                                 f"<b>пополнил баланс на сумму</b> <code>{pay_amount}руб</code> 🥝\n"
+                                 f"📃 <b>Чек:</b> <code>+{receipt}</code>")
+        else:
+            await bot.answer_callback_query(call.id, "❗ Ваше пополнение уже зачислено.", True)
+    else:
+        await bot.answer_callback_query(call.id, "❗ Оплата не была произведена.", True)
 ###################################################################################
 ####################################### QIWI ######################################
 # Принятие суммы для пополнения средств через QIWI

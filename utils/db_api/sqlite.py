@@ -144,6 +144,23 @@ def update_paymentx(**kwargs):
         db.execute(sql, parameters)
         db.commit()
 
+def edit_crystal(yoomoney_data: dict):
+    with sqlite3.connect(path_to_db) as db:
+        cur = db.cursor()
+        cur.execute("UPDATE CrystalPay SET name = ? , secret = ? WHERE id = ?",
+                    (yoomoney_data['name'], yoomoney_data['secret'], 1))
+def get_crystal():
+    with sqlite3.connect(path_to_db) as db:
+        cur = db.cursor()
+        return cur.execute("SELECT * FROM CrystalPay").fetchone()
+
+def update_paymentc(**kwargs):
+    with sqlite3.connect(path_to_db) as db:
+        sql = f"UPDATE CrystalPay SET XXX "
+        sql, parameters = update_format_with_args(sql, kwargs)
+        db.execute(sql, parameters)
+        db.commit()
+
 
 # Получение настроек
 def get_settingsx():
@@ -613,7 +630,14 @@ def create_bdx():
                    "num TEXT,"
                    "token TEXT,"
                    "status TEXT)")
-
+        db.execute("CREATE TABLE IF NOT EXISTS CrystalPay ("
+                   "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+                   "name TEXT,"
+                   "secret TEXT,"
+                   "status TEXT)")
+        if len(db.execute("SELECT * FROM CrystalPay").fetchall()) == 0:
+            db.execute("INSERT INTO CrystalPay (name, secret, status) VALUES (?, ?, ?)",
+                       ("name", "secret", "False"))
         if len(db.execute("SELECT * FROM YooMoney").fetchall()) == 0:
             db.execute("INSERT INTO YooMoney (num, token) VALUES (?, ?)",
                        ("num", "token"))

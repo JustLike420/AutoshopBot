@@ -7,14 +7,13 @@ from aiogram import types
 from aiogram.dispatcher import FSMContext
 from aiogram.types import CallbackQuery
 from pyqiwip2p import QiwiP2P
-
 from filters import IsAdmin
 from keyboards.default import payment_default
 from keyboards.inline import choice_way_input_payment_func
 from loader import dp, bot
-from states import StorageQiwi, StorageYooMoney
+from states import StorageQiwi, StorageYooMoney, StorageCrystalPay
 from utils import send_all_admin, clear_firstname
-from utils.db_api.sqlite import get_paymentx, update_paymentx, edit_yoomoney, update_paymenty
+from utils.db_api.sqlite import get_paymentx, update_paymentx, edit_yoomoney, update_paymenty, update_paymentc, edit_crystal
 
 from utils import yoomoney_auth, generate_token
 
@@ -63,6 +62,28 @@ async def turn_on_refill(message: types.Message, state: FSMContext):
     await state.finish()
     update_paymenty(status="True")
     await message.answer("<b>🟢 Пополнения yoomoney в боте были включены.</b>",
+                         reply_markup=payment_default())
+    await send_all_admin(
+        f"👤 Администратор <a href='tg://user?id={message.from_user.id}'>{clear_firstname(message.from_user.first_name)}</a>\n"
+        "🟢 Включил пополнения yoomoney в боте.", not_me=message.from_user.id)
+
+@dp.message_handler(IsAdmin(), text="🔴 Выключить пополнения CrystalPay", state="*")
+async def turn_off_refill(message: types.Message, state: FSMContext):
+    await state.finish()
+    update_paymentc(status="False")
+    await message.answer("<b>🔴 Пополнения CrystalPay в боте были выключены.</b>",
+                         reply_markup=payment_default())
+    await send_all_admin(
+        f"👤 Администратор <a href='tg://user?id={message.from_user.id}'>{clear_firstname(message.from_user.first_name)}</a>\n"
+        "🔴 Выключил пополнения yoomoney в боте.", not_me=message.from_user.id)
+
+
+# Выключение пополнения
+@dp.message_handler(IsAdmin(), text="🟢 Включить пополнения CrystalPay", state="*")
+async def turn_on_refill(message: types.Message, state: FSMContext):
+    await state.finish()
+    update_paymentc(status="True")
+    await message.answer("<b>🟢 Пополнения CrystalPay в боте были включены.</b>",
                          reply_markup=payment_default())
     await send_all_admin(
         f"👤 Администратор <a href='tg://user?id={message.from_user.id}'>{clear_firstname(message.from_user.first_name)}</a>\n"
@@ -343,3 +364,35 @@ async def authorize_payment(message: types.Message, state: FSMContext):
     # await message.answer(message_text, reply_markup=get_keyboard_for_finish(message.chat.id))
 
     await state.finish()
+
+###################################################################################
+####################################### CRYSTAL PAY ##################################
+
+@dp.message_handler(IsAdmin(), text="Изменить CrystalPay 🖍", state="*")
+async def client_id(message: types.Message):
+    await message.answer(""
+                         "Введите <b>название</b>")
+    await StorageCrystalPay.name.set()
+
+
+@dp.message_handler(state=StorageCrystalPay.name)
+async def name(message: types.Message, state: FSMContext):
+    name = message.text
+
+    await state.update_data(name=name)
+    await StorageCrystalPay.next()
+    await message.answer("🌐 Введите <b>secret token</b>")
+
+
+@dp.message_handler(state=StorageCrystalPay.secret)
+async def secret(message: types.Message, state: FSMContext):
+    secret = message.text
+
+    await state.update_data(secret=secret)
+
+    crystal_data = await state.get_data()
+    edit_crystal(crystal_data)
+    await message.answer('✅ Кошелек изменен')
+    await state.finish()
+
+
