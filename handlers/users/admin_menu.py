@@ -88,9 +88,9 @@ def get_about_bot():
     for user in all_users:
         show_money_in_bot += int(user[4])
     for refill in all_refill:
-        show_refill += int(refill[5])
-        if int(get_settings[5]) - int(refill[9]) < 86400:
-            show_buy_day += int(refill[5])
+        show_refill += float(refill[5])
+        if int(get_settings[5]) - float(refill[9]) < 86400:
+            show_buy_day += float(refill[5])
     message = "<b>📰 ВСЯ ИНФОРАМЦИЯ О БОТЕ</b>\n" \
               f"➖➖➖➖➖➖➖➖➖➖➖➖➖\n" \
               f"<b>🔶 Пользователи: 🔶</b>\n" \

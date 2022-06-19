@@ -9,6 +9,12 @@ def create_pay_qiwi_func(send_requests, receipt, message_id, way):
                                                 callback_data=f"Pay:{way}:{receipt}:{message_id}"))
     return check_qiwi_pay_inl
 
+def create_pay_yoo_func(send_requests, receipt, message_id, way):
+    check_yoo_pay_inl = InlineKeyboardMarkup()
+    check_yoo_pay_inl.add(InlineKeyboardButton(text="🌀 Перейти к оплате", url=send_requests))
+    check_yoo_pay_inl.add(InlineKeyboardButton(text="🔄 Проверить оплату",
+                                                callback_data=f"Pay:{way}:{receipt}:{message_id}"))
+    return check_yoo_pay_inl
 
 # Кнопки при открытии самого товара
 def open_item_func(position_id, remover, category_id):

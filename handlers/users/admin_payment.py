@@ -12,35 +12,61 @@ from filters import IsAdmin
 from keyboards.default import payment_default
 from keyboards.inline import choice_way_input_payment_func
 from loader import dp, bot
-from states import StorageQiwi
+from states import StorageQiwi, StorageYooMoney
 from utils import send_all_admin, clear_firstname
-from utils.db_api.sqlite import get_paymentx, update_paymentx
+from utils.db_api.sqlite import get_paymentx, update_paymentx, edit_yoomoney, update_paymenty
+
+from utils import yoomoney_auth, generate_token
 
 
 ###################################################################################
 ########################### ВКЛЮЧЕНИЕ/ВЫКЛЮЧЕНИЕ ПОПОЛНЕНИЯ #######################
 # Включение пополнения
-@dp.message_handler(IsAdmin(), text="🔴 Выключить пополнения", state="*")
+@dp.message_handler(IsAdmin(), text="🔴 Выключить пополнения qiwi", state="*")
 async def turn_off_refill(message: types.Message, state: FSMContext):
     await state.finish()
     update_paymentx(status="False")
-    await message.answer("<b>🔴 Пополнения в боте были выключены.</b>",
+    await message.answer("<b>🔴 Пополнения qiwi в боте были выключены.</b>",
                          reply_markup=payment_default())
     await send_all_admin(
         f"👤 Администратор <a href='tg://user?id={message.from_user.id}'>{clear_firstname(message.from_user.first_name)}</a>\n"
-        "🔴 Выключил пополнения в боте.", not_me=message.from_user.id)
+        "🔴 Выключил пополнения  qiwi в боте.", not_me=message.from_user.id)
 
 
 # Выключение пополнения
-@dp.message_handler(IsAdmin(), text="🟢 Включить пополнения", state="*")
+@dp.message_handler(IsAdmin(), text="🟢 Включить пополнения qiwi", state="*")
 async def turn_on_refill(message: types.Message, state: FSMContext):
     await state.finish()
     update_paymentx(status="True")
-    await message.answer("<b>🟢 Пополнения в боте были включены.</b>",
+    await message.answer("<b>🟢 Пополнения qiwi в боте были включены.</b>",
                          reply_markup=payment_default())
     await send_all_admin(
         f"👤 Администратор <a href='tg://user?id={message.from_user.id}'>{clear_firstname(message.from_user.first_name)}</a>\n"
-        "🟢 Включил пополнения в боте.", not_me=message.from_user.id)
+        "🟢 Включил пополнения qiwi в боте.", not_me=message.from_user.id)
+
+
+# Включение пополнения
+@dp.message_handler(IsAdmin(), text="🔴 Выключить пополнения yoomoney", state="*")
+async def turn_off_refill(message: types.Message, state: FSMContext):
+    await state.finish()
+    update_paymenty(status="False")
+    await message.answer("<b>🔴 Пополнения yoomoney в боте были выключены.</b>",
+                         reply_markup=payment_default())
+    await send_all_admin(
+        f"👤 Администратор <a href='tg://user?id={message.from_user.id}'>{clear_firstname(message.from_user.first_name)}</a>\n"
+        "🔴 Выключил пополнения yoomoney в боте.", not_me=message.from_user.id)
+
+
+# Выключение пополнения
+@dp.message_handler(IsAdmin(), text="🟢 Включить пополнения yoomoney", state="*")
+async def turn_on_refill(message: types.Message, state: FSMContext):
+    await state.finish()
+    update_paymenty(status="True")
+    await message.answer("<b>🟢 Пополнения yoomoney в боте были включены.</b>",
+                         reply_markup=payment_default())
+    await send_all_admin(
+        f"👤 Администратор <a href='tg://user?id={message.from_user.id}'>{clear_firstname(message.from_user.first_name)}</a>\n"
+        "🟢 Включил пополнения yoomoney в боте.", not_me=message.from_user.id)
 
 
 ###################################################################################
@@ -252,4 +278,68 @@ async def change_secret_api(message: types.Message, state: FSMContext):
                              "<u>❗ Указывайте СЕКРЕТНЫЙ КЛЮЧ, а не публичный</u>\n"
                              "❕ Секретный ключ заканчивается на =",
                              reply_markup=payment_default())
+    await state.finish()
+
+
+###################################################################################
+####################################### YOOMONEY ##################################
+
+@dp.message_handler(IsAdmin(), text="Изменить YooMoney 🖍", state="*")
+async def client_id(message: types.Message):
+    await message.answer("Зарегестрируйте API <a href='https://yoomoney.ru/myservices/new'>здесь</a>\n"
+                         "📱 Введите <b>client_id</b>")
+    await StorageYooMoney.client_id.set()
+
+
+@dp.message_handler(state=StorageYooMoney.client_id)
+async def redirect_uri(message: types.Message, state: FSMContext):
+    id = message.text
+
+    await state.update_data(client_id=id)
+    await StorageYooMoney.next()
+    await message.answer("🌐 Введите <b>redirect_uri</b>")
+
+
+@dp.message_handler(state=StorageYooMoney.redirect_uri)
+async def authorize_url(message: types.Message, state: FSMContext):
+    uri = message.text
+
+    await state.update_data(redirect_uri=uri)
+    data = await state.get_data()
+
+    auth_url = yoomoney_auth(data['client_id'], uri)
+
+    keyboard = types.InlineKeyboardMarkup()
+    keyboard.add(types.InlineKeyboardButton(text="💻 Активация", url=auth_url))
+
+    await message.answer("❗️ Перейдите по ссылке, подтвердите данные и скопируйте полученную ссылку после "
+                         "переадресации\n "
+                         "❗️ Время действия полученной ссылки <b>1 минута</b>",
+                         reply_markup=keyboard)
+    await StorageYooMoney.next()
+
+
+@dp.message_handler(state=StorageYooMoney.authorize)
+async def authorize_payment(message: types.Message, state: FSMContext):
+    url = message.text
+
+    data = await state.get_data()
+
+    access_token = generate_token(data['client_id'], data['redirect_uri'], url)
+
+    if access_token is not None:
+        # токен получен успешно
+        num = access_token.split(".")[0]
+        await state.update_data(num=num)
+        await state.update_data(token=access_token)
+
+        yoomoney_data = await state.get_data()
+        edit_yoomoney(yoomoney_data)
+
+        message_text = "✅ Кошелек изменен"
+    else:
+        message_text = "❗️ Кошелек не доступен, повторите добавление снова"
+    await message.answer(message_text)
+    # await message.answer(message_text, reply_markup=get_keyboard_for_finish(message.chat.id))
+
     await state.finish()
