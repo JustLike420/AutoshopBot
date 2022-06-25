@@ -203,13 +203,15 @@ async def create_crystal_pay(message: types.Message, state: FSMContext):
         await message.answer("<b>❌ Данные были введены неверно.</b>\n"
                              "💵 Введите сумму для пополнения средств (min 2rub)")
 
+
 @dp.callback_query_handler(text_startswith="Pay:Crystal:")
 async def check_crystal_pay(call: CallbackQuery):
     call_data = call.data.split(":")
     receipt = call_data[2]
     message_id = call_data[3]
     way_pay = call_data[1]
-    crystal = CrystalPay('testererwerer', 'ba225fd21701497d91e70ed41333914448a1afd0')
+    crystal_data = get_crystal()
+    crystal = CrystalPay(crystal_data[1], crystal_data[2])
     status = crystal.get_pay_status(receipt)
     pay_amount = status[1]
     # get_payments = get_paymentx()
@@ -241,6 +243,8 @@ async def check_crystal_pay(call: CallbackQuery):
             await bot.answer_callback_query(call.id, "❗ Ваше пополнение уже зачислено.", True)
     else:
         await bot.answer_callback_query(call.id, "❗ Оплата не была произведена.", True)
+
+
 ###################################################################################
 ####################################### QIWI ######################################
 # Принятие суммы для пополнения средств через QIWI
