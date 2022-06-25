@@ -31,8 +31,7 @@ async def change_contact(message: types.Message, state: FSMContext):
     await state.finish()
     get_contact = get_settingsx()
     await message.answer(f"<b>📕 Текущие контакты:</b>\n{get_contact[0]}")
-    await message.answer("🖍 Отправьте ID пользователя.\n"
-                         "❕ Вводимый ID должен быть пользователем бота.")
+    await message.answer("🖍 Отправьте новый текст\n")
     await StorageSettings.here_contact.set()
 
 
@@ -110,18 +109,7 @@ async def get_text_for_change_faq(message: types.Message, state: FSMContext):
 @dp.message_handler(IsAdmin(), state=StorageSettings.here_contact)
 async def get_id_for_change_contact(message: types.Message, state: FSMContext):
     msg = message.text
-    if msg.isdigit():
-        get_status_user = get_userx(user_id=msg)
-        if get_status_user is None:
-            await StorageSettings.here_contact.set()
-            await message.answer("<b>❌ Пользователь не был найден.</b>\n🖍 Отправьте ID пользователя.")
-        else:
-            await state.finish()
-            msg = f"📕 <b>Писать сюда ➡ <a href='tg://user?id={msg}'>Администратор</a></b>"
-            update_settingsx(contact=msg)
-            await message.answer(f"📕 Контакты были успешно обновлены ✅",
-                                 reply_markup=get_settings_func())
-    else:
-        await StorageSettings.here_contact.set()
-        await message.answer("<b>❌ Данные были введены неверно.</b>\n"
-                             "🖍 Отправьте ID пользователя.")
+    await state.finish()
+    update_settingsx(contact=msg)
+    await message.answer(f"📕 Контакты были успешно обновлены ✅",
+                         reply_markup=get_settings_func())
