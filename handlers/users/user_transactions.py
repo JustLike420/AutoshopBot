@@ -12,10 +12,11 @@ from pyqiwip2p import QiwiP2P
 from keyboards.default import all_back_to_main_default, check_user_out_func
 from keyboards.inline import *
 from loader import dp, bot
-from states.state_payment import StorageQiwi, StorageYooMoney, StorageCrystalPay
+from states.state_payment import StorageQiwi, StorageYooMoney, StorageCrystalPay, StoragePayok
 from external.pycrystalpay import CrystalPay
+from external.pypayok import PayOk
 from utils import send_all_admin, clear_firstname, get_dates
-from utils.db_api.sqlite import update_userx, get_refillx, add_refillx, get_yoomoney, get_crystal
+from utils.db_api.sqlite import update_userx, get_refillx, add_refillx, get_yoomoney, get_crystal, get_payok
 
 
 ###################################################################################
@@ -158,6 +159,7 @@ async def input_payment(call: CallbackQuery):
     markup.add(InlineKeyboardButton(text="YooMoney",
                                     callback_data="yoo_paym"))
     markup.add(InlineKeyboardButton(text="CrystalPay", callback_data="crystal_paym"))
+    markup.add(InlineKeyboardButton(text="Payok", callback_data="payok_paym"))
     await call.message.answer("<b>Выбери способ оплаты:</b>",
                               reply_markup=markup)
 
@@ -477,3 +479,83 @@ async def check_qiwi_pay(call: CallbackQuery):
         await bot.answer_callback_query(call.id, "❗ Извиняемся за доставленные неудобства,\n"
                                                  "проверка платежа временно недоступна.\n"
                                                  "⏳ Попробуйте чуть позже.")
+
+
+###################################################################################
+####################################### payok ###################################
+@dp.callback_query_handler(text="payok_paym", state="*")
+async def input_amount_payok(call: CallbackQuery, state: FSMContext):
+    get_payment = get_payok()
+    if get_payment[5] == "True":
+        await StoragePayok.here_input_payok_amount.set()
+        await bot.delete_message(call.from_user.id, call.message.message_id)
+        await call.message.answer("<b>💵 Введите сумму для пополнения средств</b>",
+                                  reply_markup=all_back_to_main_default)
+
+    else:
+        await bot.answer_callback_query(call.id, "❗ Пополнение временно недоступно")
+        await send_all_admin(
+            f"👤 Пользователь <a href='tg://user?id={call.from_user.id}'>{clear_firstname(call.from_user.first_name)}</a> "
+            f"пытался пополнить баланс через Payok.")
+
+
+@dp.message_handler(state=StoragePayok.here_input_payok_amount)
+async def create_payok_pay(message: types.Message, state: FSMContext):
+    if message.text.isdigit() and int(message.text) >= 2:
+        amount = int(message.text)
+        payok_data = get_payok()
+        print(payok_data)
+        comment = str(random.randint(100000000000, 999999999999))
+        del_msg = await bot.send_message(message.from_user.id, "<b>♻ Подождите, платёж генерируется...</b>")
+        payok = PayOk(payok_data[1], payok_data[2], payok_data[3], payok_data[4])
+        link = payok.generate_pay_link(message.text, comment)
+        await bot.delete_message(message.chat.id, del_msg.message_id)
+        delete_msg = await message.answer("🥝 <b>Платёж был создан.</b>",
+                                          reply_markup=check_user_out_func(message.from_user.id))
+        await message.answer("🎈 Ссылка на оплату сгенерирована:\n"
+                             f"✔ ID платежа: {comment}\n"
+                             f"📎 Ссылка: <a href='{link}'>нажмите для пополнения счёта</a>",
+                             reply_markup=create_pay_payok_func(send_requests=link, receipt=comment,
+                                                                  message_id=message.message_id, way="Payok"))
+        await state.finish()
+    else:
+        await StoragePayok.here_input_payok_amount.set()
+        await message.answer("<b>❌ Данные были введены неверно.</b>\n"
+                             "💵 Введите сумму для пополнения средств (min 2rub)")
+
+@dp.callback_query_handler(text_startswith="Pay:Payok:")
+async def check_payok_pay(call: CallbackQuery):
+    payok_data = get_payok()
+    call_data = call.data.split(":")
+    receipt = call_data[2]
+    message_id = call_data[3]
+    way_pay = call_data[1]
+    payok = PayOk(payok_data[1], payok_data[2], payok_data[3], payok_data[4])
+    status, price = payok.get_pay_status(receipt)
+    get_user_info = get_userx(user_id=call.from_user.id)
+    if status:
+        get_purchase = get_refillx("*", receipt=receipt)
+        if get_purchase is None:
+            add_refillx(call.from_user.id, call.from_user.username, call.from_user.first_name, receipt,
+                        price, receipt, way_pay, get_dates(), int(time.time()))
+
+            # Обновление баланса у пользователя
+            update_userx(call.from_user.id,
+                         balance=int(get_user_info[4]) + price,
+                         all_refill=int(get_user_info[5]) + price)
+
+            await bot.delete_message(call.message.chat.id, message_id)
+            await call.message.delete()
+            await call.message.answer(
+                f"<b>✅ Вы успешно пополнили баланс на сумму {price}руб. Удачи ❤</b>\n"
+                f"<b>📃 Чек:</b> <code>+{receipt}</code>",
+                reply_markup=check_user_out_func(call.from_user.id))
+            await send_all_admin(f"<b>💰 Пользователь</b> "
+                                 f"(@{call.from_user.username}|<a href='tg://user?id={call.from_user.id}'>{call.from_user.first_name}</a>"
+                                 f"|<code>{call.from_user.id}</code>) "
+                                 f"<b>пополнил баланс на сумму</b> <code>{price}руб</code> 🥝\n"
+                                 f"📃 <b>Чек:</b> <code>+{receipt}</code>")
+        else:
+            await bot.answer_callback_query(call.id, "❗ Ваше пополнение уже зачислено.", True)
+    else:
+        await bot.answer_callback_query(call.id, "❗ Оплата не была произведена.", True)

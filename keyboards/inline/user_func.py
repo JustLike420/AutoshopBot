@@ -23,6 +23,12 @@ def create_pay_crystal_func(send_requests, receipt, message_id, way):
                                                 callback_data=f"Pay:{way}:{receipt}:{message_id}"))
     return check_crystal_pay_inl
 
+def create_pay_payok_func(send_requests, receipt, message_id, way):
+    check_payok_pay_inl = InlineKeyboardMarkup()
+    check_payok_pay_inl.add(InlineKeyboardButton(text="🌀 Перейти к оплате", url=send_requests))
+    check_payok_pay_inl.add(InlineKeyboardButton(text="🔄 Проверить оплату",
+                                                callback_data=f"Pay:{way}:{receipt}:{message_id}"))
+    return check_payok_pay_inl
 # Кнопки при открытии самого товара
 def open_item_func(position_id, remover, category_id):
     open_item = InlineKeyboardMarkup()

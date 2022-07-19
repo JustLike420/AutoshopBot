@@ -18,3 +18,10 @@ class StorageCrystalPay(StatesGroup):
     name = State()
     secret = State()
     here_input_crystal_amount = State()
+
+class StoragePayok(StatesGroup):
+    API_ID = State()
+    API_KEY = State()
+    shop = State()
+    secret = State()
+    here_input_payok_amount = State()

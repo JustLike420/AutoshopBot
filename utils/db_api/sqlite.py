@@ -161,6 +161,24 @@ def update_paymentc(**kwargs):
         db.execute(sql, parameters)
         db.commit()
 
+# payok
+def edit_payok(payok_data: dict):
+    with sqlite3.connect(path_to_db) as db:
+        cur = db.cursor()
+        cur.execute("UPDATE Payok SET API_ID=?, API_KEY=?, secret=?, shop=? WHERE id = ?",
+                    (payok_data['API_ID'], payok_data['API_KEY'],payok_data['secret'], payok_data['shop'], 1))
+def get_payok():
+    with sqlite3.connect(path_to_db) as db:
+        cur = db.cursor()
+        return cur.execute("SELECT * FROM Payok").fetchone()
+
+def update_paymentp(**kwargs):
+    with sqlite3.connect(path_to_db) as db:
+        sql = f"UPDATE Payok SET XXX "
+        sql, parameters = update_format_with_args(sql, kwargs)
+        db.execute(sql, parameters)
+        db.commit()
+
 
 # Получение настроек
 def get_settingsx():
@@ -635,6 +653,16 @@ def create_bdx():
                    "name TEXT,"
                    "secret TEXT,"
                    "status TEXT)")
+        db.execute("CREATE TABLE IF NOT EXISTS Payok ("
+                   "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+                   "API_ID TEXT,"
+                   "API_KEY TEXT,"
+                   "secret TEXT,"
+                   "shop TEXT,"
+                   "status TEXT)")
+        if len(db.execute("SELECT * FROM Payok").fetchall()) == 0:
+            db.execute("INSERT INTO Payok (API_ID, API_KEY, secret, shop, status) VALUES (?, ?, ?, ?, ?)",
+                       ("API_ID", "API_KEY", "secret", "shop", "False"))
         if len(db.execute("SELECT * FROM CrystalPay").fetchall()) == 0:
             db.execute("INSERT INTO CrystalPay (name, secret, status) VALUES (?, ?, ?)",
                        ("name", "secret", "False"))

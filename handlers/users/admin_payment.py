@@ -11,9 +11,10 @@ from filters import IsAdmin
 from keyboards.default import payment_default
 from keyboards.inline import choice_way_input_payment_func
 from loader import dp, bot
-from states import StorageQiwi, StorageYooMoney, StorageCrystalPay
+from states import StorageQiwi, StorageYooMoney, StorageCrystalPay, StoragePayok
 from utils import send_all_admin, clear_firstname
-from utils.db_api.sqlite import get_paymentx, update_paymentx, edit_yoomoney, update_paymenty, update_paymentc, edit_crystal
+from utils.db_api.sqlite import get_paymentx, update_paymentx, edit_yoomoney, update_paymenty, update_paymentc, \
+    edit_crystal, update_paymentp, edit_payok
 
 from utils import yoomoney_auth, generate_token
 
@@ -67,6 +68,7 @@ async def turn_on_refill(message: types.Message, state: FSMContext):
         f"👤 Администратор <a href='tg://user?id={message.from_user.id}'>{clear_firstname(message.from_user.first_name)}</a>\n"
         "🟢 Включил пополнения yoomoney в боте.", not_me=message.from_user.id)
 
+
 @dp.message_handler(IsAdmin(), text="🔴 Выключить пополнения CrystalPay", state="*")
 async def turn_off_refill(message: types.Message, state: FSMContext):
     await state.finish()
@@ -88,6 +90,29 @@ async def turn_on_refill(message: types.Message, state: FSMContext):
     await send_all_admin(
         f"👤 Администратор <a href='tg://user?id={message.from_user.id}'>{clear_firstname(message.from_user.first_name)}</a>\n"
         "🟢 Включил пополнения yoomoney в боте.", not_me=message.from_user.id)
+
+
+@dp.message_handler(IsAdmin(), text="🔴 Выключить пополнения Payok", state="*")
+async def turn_off_refill_p(message: types.Message, state: FSMContext):
+    await state.finish()
+    update_paymentp(status="False")
+    await message.answer("<b>🔴 Пополнения payok в боте были выключены.</b>",
+                         reply_markup=payment_default())
+    await send_all_admin(
+        f"👤 Администратор <a href='tg://user?id={message.from_user.id}'>{clear_firstname(message.from_user.first_name)}</a>\n"
+        "🔴 Выключил пополнения payok в боте.", not_me=message.from_user.id)
+
+
+# Выключение пополнения
+@dp.message_handler(IsAdmin(), text="🟢 Включить пополнения Payok", state="*")
+async def turn_on_refill_p(message: types.Message, state: FSMContext):
+    await state.finish()
+    update_paymentp(status="True")
+    await message.answer("<b>🟢 Пополнения payok в боте были включены.</b>",
+                         reply_markup=payment_default())
+    await send_all_admin(
+        f"👤 Администратор <a href='tg://user?id={message.from_user.id}'>{clear_firstname(message.from_user.first_name)}</a>\n"
+        "🟢 Включил пополнения payok в боте.", not_me=message.from_user.id)
 
 
 ###################################################################################
@@ -365,6 +390,7 @@ async def authorize_payment(message: types.Message, state: FSMContext):
 
     await state.finish()
 
+
 ###################################################################################
 ####################################### CRYSTAL PAY ##################################
 
@@ -396,3 +422,47 @@ async def secret(message: types.Message, state: FSMContext):
     await state.finish()
 
 
+###################################################################################
+####################################### PAYOK ##################################
+@dp.message_handler(IsAdmin(), text="Изменить Payok 🖍", state="*")
+async def api_id(message: types.Message):
+    await message.answer(""
+                         "Введите <b>API_ID</b>")
+    await StoragePayok.API_ID.set()
+
+
+@dp.message_handler(state=StoragePayok.API_ID)
+async def api_key(message: types.Message, state: FSMContext):
+    API_ID = message.text
+
+    await state.update_data(API_ID=API_ID)
+    await StoragePayok.next()
+    await message.answer("Введите <b>API_KEY</b>")
+
+
+@dp.message_handler(state=StoragePayok.API_KEY)
+async def api_key(message: types.Message, state: FSMContext):
+    API_KEY = message.text
+
+    await state.update_data(API_KEY=API_KEY)
+    await StoragePayok.next()
+    await message.answer("Введите <b>shop</b>")
+
+
+@dp.message_handler(state=StoragePayok.shop)
+async def api_key(message: types.Message, state: FSMContext):
+    shop = message.text
+
+    await state.update_data(shop=shop)
+    await StoragePayok.next()
+    await message.answer("Введите <b>secret</b>")
+@dp.message_handler(state=StoragePayok.secret)
+async def shop(message: types.Message, state: FSMContext):
+    secret = message.text
+
+    await state.update_data(secret=secret)
+
+    payok_data = await state.get_data()
+    edit_payok(payok_data)
+    await message.answer('✅ Кошелек изменен')
+    await state.finish()
