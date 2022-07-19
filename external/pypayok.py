@@ -95,11 +95,16 @@ class PayOk:
             'payment': pay_id
         }
         answer_from_host = loads(post(__base_url__ + '/api/transaction', data).text)
-        if answer_from_host['1']['transaction_status'] == 1:
+        print(answer_from_host)
+        amount = -1
+        if answer_from_host['status'] == 'error':
+            state = False
+        elif answer_from_host['1']['transaction_status'] == '1':
             state = True
+            amount = float(answer_from_host['1']['amount_profit'])
         else:
             state = False
-        return state, float(answer_from_host['1']['amount_profit'])
+        return state, amount
 
 
 def del_tab(x: str):
