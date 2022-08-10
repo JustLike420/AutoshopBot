@@ -27,8 +27,7 @@ class Banker:
             if "Упс!" in response:
                 return False
             try:
-                btc = float(re.findall(r'\d+\.\d+ BTC', response)[0][:-4])
-                response = btc * float(requests.get("https://apirone.com/api/v2/ticker?currency=btc").json()["rub"])
+                response = float(re.findall(r'\d+\,\d+RUB', response)[0].replace('RUB', '').replace(',', '.'))
             except IndexError or ValueError:
                 return False
             return response
