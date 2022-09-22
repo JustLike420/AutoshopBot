@@ -185,12 +185,22 @@ def get_all_refillx():
 
 
 # Добавление категории в БД
-def add_categoryx(category_id, category_name):
+def add_categoryx(category_id, category_name, subcategory_id):
     with sqlite3.connect(path_to_db) as db:
         db.execute("INSERT INTO storage_category "
-                   "(category_id, category_name) "
+                   "(category_id, category_name, subcategory_id) "
+                   "VALUES (?, ?, ?)",
+                   [category_id, category_name, subcategory_id])
+        db.commit()
+
+
+# Добавление подкатегории в БД
+def add_subcategoryx(subcategory_id, subcategory_name):
+    with sqlite3.connect(path_to_db) as db:
+        db.execute("INSERT INTO storage_subcategory "
+                   "(subcategory_id, subcategory_name) "
                    "VALUES (?, ?)",
-                   [category_id, category_name])
+                   [subcategory_id, subcategory_name])
         db.commit()
 
 
@@ -203,10 +213,29 @@ def update_categoryx(category_id, **kwargs):
         db.commit()
 
 
+# Изменение подкатегории
+def update_subcategoryx(subcategory_id, **kwargs):
+    with sqlite3.connect(path_to_db) as db:
+        sql = f"UPDATE storage_subcategory SET XXX WHERE subcategory_id = {subcategory_id}"
+        sql, parameters = update_format_with_args(sql, kwargs)
+        db.execute(sql, parameters)
+        db.commit()
+
+
 # Получение категории
 def get_categoryx(what_select, **kwargs):
     with sqlite3.connect(path_to_db) as db:
         sql = f"SELECT {what_select} FROM storage_category WHERE "
+        sql, parameters = get_format_args(sql, kwargs)
+        get_response = db.execute(sql, parameters)
+        get_response = get_response.fetchone()
+    return get_response
+
+
+# Получение подкатегории
+def get_subcategoryx(what_select, **kwargs):
+    with sqlite3.connect(path_to_db) as db:
+        sql = f"SELECT {what_select} FROM storage_subcategory WHERE "
         sql, parameters = get_format_args(sql, kwargs)
         get_response = db.execute(sql, parameters)
         get_response = get_response.fetchone()
@@ -232,6 +261,15 @@ def get_all_categoriesx():
     return get_response
 
 
+# Получение всех подкатегорий
+def get_all_subcategoriesx():
+    with sqlite3.connect(path_to_db) as db:
+        sql = "SELECT * FROM storage_subcategory"
+        get_response = db.execute(sql)
+        get_response = get_response.fetchall()
+    return get_response
+
+
 # Очистка категорий
 def clear_categoryx():
     with sqlite3.connect(path_to_db) as db:
@@ -239,6 +277,12 @@ def clear_categoryx():
         db.execute(sql)
         db.commit()
 
+# Очистка подкатегорий
+def clear_subcategoryx():
+    with sqlite3.connect(path_to_db) as db:
+        sql = "DELETE FROM storage_subcategory"
+        db.execute(sql)
+        db.commit()
 
 # Удаление товаров
 def remove_categoryx(**kwargs):
@@ -248,6 +292,13 @@ def remove_categoryx(**kwargs):
         db.execute(sql, parameters)
         db.commit()
 
+# Удаление подкатегории
+def remove_subcategoryx(**kwargs):
+    with sqlite3.connect(path_to_db) as db:
+        sql = "DELETE FROM storage_subcategory WHERE "
+        sql, parameters = get_format_args(sql, kwargs)
+        db.execute(sql, parameters)
+        db.commit()
 
 # Добавление категории в БД
 def add_positionx(position_id, position_name, position_price, position_discription, position_image, position_date,
@@ -536,12 +587,26 @@ def create_bdx():
         check_sql = db.execute("PRAGMA table_info(storage_category)")
         check_sql = check_sql.fetchall()
         check_create_category = [c for c in check_sql]
-        if len(check_create_category) == 3:
+        if len(check_create_category) == 4:
             print("DB was found(5/8)")
         else:
             db.execute("CREATE TABLE storage_category("
                        "increment INTEGER PRIMARY KEY AUTOINCREMENT,"
-                       "category_id INTEGER, category_name TEXT)")
+                       "category_id INTEGER, category_name TEXT,"
+                       "subcategory_id INTEGER)")
+            print("DB was not found(5/8) | Creating...")
+
+        # Создание БД с хранением подкатегорий
+        check_sql = db.execute("PRAGMA table_info(storage_subcategory)")
+        check_sql = check_sql.fetchall()
+        check_create_category = [c for c in check_sql]
+        if len(check_create_category) == 3:
+            print("DB was found(5.5/8)")
+        else:
+            db.execute("CREATE TABLE storage_subcategory("
+                       "increment INTEGER PRIMARY KEY AUTOINCREMENT,"
+                       "subcategory_id INTEGER, "
+                       "subcategory_name TEXT)")
             print("DB was not found(5/8) | Creating...")
 
         # Создание БД с хранением позиций

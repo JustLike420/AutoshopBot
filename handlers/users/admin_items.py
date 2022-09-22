@@ -12,26 +12,53 @@ from keyboards.inline import *
 from keyboards.inline.inline_page import *
 from loader import dp, bot
 from middlewares.throttling import rate_limit
-from states.state_items import StoragePosition, StorageCategory, StorageItems
+from states.state_items import StoragePosition, StorageCategory, StorageItems, StorageSubCategory
 from utils.other_func import clear_firstname, get_dates
+
+
+# новая подкатегория
+@dp.message_handler(IsAdmin(), text="📜 Создать первую категорию ➕", state="*")
+async def subcategory_create_new(message: types.Message, state: FSMContext):
+    await state.finish()
+    await StorageSubCategory.here_input_subcategory_name.set()
+    await message.answer("<b>📜 Введите название для первой категории 🏷</b>")
 
 
 # Создание новой категории
 @dp.message_handler(IsAdmin(), text="📜 Создать категорию ➕", state="*")
 async def category_create_new(message: types.Message, state: FSMContext):
     await state.finish()
-    await StorageCategory.here_input_category_name.set()
-    await message.answer("<b>📜 Введите название для категории 🏷</b>")
+    get_categories = get_all_subcategoriesx()
+    if len(get_categories) >= 1:
+        get_kb = category_open_create_ap(0)
+        await message.answer("<b>📁 Выберите место для категории ➕</b>", reply_markup=get_kb)
+    else:
+        await message.answer("<b>❌ Отсутствуют первые категории для создания категории.</b>")
+
 
 
 # Открытие страниц выбора категорий для редактирования
 @dp.message_handler(IsAdmin(), text="📜 Изменить категорию 🖍", state="*")
 async def category_open_edit(message: types.Message, state: FSMContext):
     await state.finish()
-    get_categories = get_all_categoriesx()
+    # get_categories = get_all_categoriesx()
+    get_categories = get_all_subcategoriesx()
+
     if len(get_categories) >= 1:
-        get_kb = category_open_edit_ap(0)
+        get_kb = category_open_edit_cat(0)
         await message.answer("<b>📜 Выберите категорию для изменения 🖍</b>", reply_markup=get_kb)
+    else:
+        await message.answer("<b>📜 Категории отсутствуют 🖍</b>")
+
+
+# Открытие страниц выбора категорий для редактирования
+@dp.message_handler(IsAdmin(), text="📜 Изменить первую категорию 🖍", state="*")
+async def subcategory_open_edit(message: types.Message, state: FSMContext):
+    await state.finish()
+    get_categories = get_all_subcategoriesx()
+    if len(get_categories) >= 1:
+        get_kb = subcategory_open_edit_ap(0)
+        await message.answer("<b>📜 Выберите первую категорию для изменения 🖍</b>", reply_markup=get_kb)
     else:
         await message.answer("<b>📜 Категории отсутствуют 🖍</b>")
 
@@ -44,14 +71,21 @@ async def category_remove_all(message: types.Message, state: FSMContext):
                          "❗ Так же будут удалены все позиции и товары",
                          reply_markup=confirm_clear_category_inl)
 
+# Окно с уточнением удалить все категории (позиции и товары включительно)
+@dp.message_handler(IsAdmin(), text="📜 Удалить первые категории ❌", state="*")
+async def subcategory_remove_all(message: types.Message, state: FSMContext):
+    await state.finish()
+    await message.answer("<b>📜 Вы действительно хотите удалить все под категории? ❌</b>\n"
+                         "❗ Так же будут удалены все позиции и товары",
+                         reply_markup=confirm_clear_subcategory_inl)
 
 # Создание новой позиции
 @dp.message_handler(IsAdmin(), text="📁 Создать позицию ➕", state="*")
 async def position_create_new(message: types.Message, state: FSMContext):
     await state.finish()
-    get_categories = get_all_categoriesx()
+    get_categories = get_all_subcategoriesx()
     if len(get_categories) >= 1:
-        get_kb = position_open_create_ap(0)
+        get_kb = position_open_create_cat(0)
         await message.answer("<b>📁 Выберите место для позиции ➕</b>", reply_markup=get_kb)
     else:
         await message.answer("<b>❌ Отсутствуют категории для создания позиции.</b>")
@@ -61,7 +95,7 @@ async def position_create_new(message: types.Message, state: FSMContext):
 @dp.message_handler(IsAdmin(), text="📁 Изменить позицию 🖍", state="*")
 async def choice_category_for_edit_position(message: types.Message, state: FSMContext):
     await state.finish()
-    get_kb = position_open_edit_category_ap(0)
+    get_kb = position_open_edit_category_cat(0)
     await message.answer("<b>📁 Выберите категорию с нужной вам позицией 🖍</b>", reply_markup=get_kb)
 
 
@@ -80,7 +114,7 @@ async def choice_category_for_edit_position(message: types.Message, state: FSMCo
     await state.finish()
     get_positions = get_all_positionsx()
     if len(get_positions) >= 1:
-        get_kb = item_open_add_category_ap(0)
+        get_kb = item_open_add_category_cat(0)
         await message.answer("<b>🎁 Выберите категорию с нужной вам позицией ➕</b>", reply_markup=get_kb)
     else:
         await message.answer("<b>❌ Отсутствуют позиции для добавления товара.</b>")
@@ -105,20 +139,72 @@ async def open_create_category(message: types.Message, state: FSMContext):
                          reply_markup=confirm_clear_item_inl)
 
 
-################################################################################################
-####################################### СОЗДАНИЕ КАТЕГОРИЙ #####################################
-# Принятие названия категории для её создания
-@dp.message_handler(IsAdmin(), state=StorageCategory.here_input_category_name)
-async def category_create_input_name(message: types.Message, state: FSMContext):
-    category_id = [random.randint(100000000, 999999999)]
-    add_categoryx(category_id[0], message.text)
+# Принятие названия первой категории для её создания
+@dp.message_handler(IsAdmin(), state=StorageSubCategory.here_input_subcategory_name)
+async def subcategory_create_input_name(message: types.Message, state: FSMContext):
+    subcategory_id = [random.randint(100000000, 999999999)]
+    add_subcategoryx(subcategory_id[0], message.text)
     await state.finish()
-    await message.answer("<b>📜 Категория была успешно создана ✅</b>",
+    await message.answer("<b>📜 Первая Категория была успешно создана ✅</b>",
                          reply_markup=items_default)
 
 
 ################################################################################################
+####################################### СОЗДАНИЕ КАТЕГОРИЙ #####################################
+# Принятие названия категории для её создания
+# @dp.message_handler(IsAdmin(), state=StorageCategory.here_input_category_name)
+# async def category_create_input_name(message: types.Message, state: FSMContext):
+#     category_id = [random.randint(100000000, 999999999)]
+#     add_categoryx(category_id[0], message.text)
+#     await state.finish()
+#     await message.answer("<b>📜 Категория была успешно создана ✅</b>",
+#                          reply_markup=items_default)
+
+
+################################################################################################
 ####################################### ИЗМЕНЕНИЕ КАТЕГОРИЙ ####################################
+# Сделующая страница выбора категорий для редактирования
+@dp.callback_query_handler(IsAdmin(), text_startswith="edit_catategory_nextp", state="*")
+async def category_edit_next_page(call: CallbackQuery, state: FSMContext):
+    remover = int(call.data.split(":")[1])
+
+    get_kb = category_edit_next_page_ap(remover)
+    await bot.edit_message_text("<b>📜 Выберите категорию для изменения 🖍</b>",
+                                call.from_user.id,
+                                call.message.message_id,
+                                reply_markup=get_kb)
+
+
+# Предыдущая страница выбора категорий для редактирования
+@dp.callback_query_handler(IsAdmin(), text_startswith="edit_catategory_prevp", state="*")
+async def category_edit_prev_page(call: CallbackQuery, state: FSMContext):
+    remover = int(call.data.split(":")[1])
+
+    get_kb = category_edit_prev_page_ap(remover)
+    await bot.edit_message_text("<b>📜 Выберите категорию для изменения 🖍</b>",
+                                call.from_user.id,
+                                call.message.message_id,
+                                reply_markup=get_kb)
+
+
+# Выбор текущей подкатегории для редактирования категории
+@dp.callback_query_handler(IsAdmin(), text_startswith="edit_cat_here", state="*")
+async def category_open_for_edit(call: CallbackQuery, state: FSMContext):
+    category_id = int(call.data.split(":")[1])
+    # remover = int(call.data.split(":")[2])
+    #
+    # messages, keyboard = edit_category_func(category_id, remover)
+    # await bot.edit_message_text(messages,
+    #                             call.from_user.id,
+    #                             call.message.message_id,
+    #                             reply_markup=keyboard)
+    get_categories = get_categoryx("*", subcategory_id=category_id)
+    get_kb = category_open_edit_ap(0, category_id)
+    if get_categories is not None:
+        await call.message.edit_text("<b>🎁 Выберите нужный вам товар:</b>",
+                                     reply_markup=get_kb)
+    else:
+        await call.answer(f"❕ Товары в категории {get_categories[2]} отсутствуют.")
 # Сделующая страница выбора категорий для редактирования
 @dp.callback_query_handler(IsAdmin(), text_startswith="edit_catategory_nextp", state="*")
 async def category_edit_next_page(call: CallbackQuery, state: FSMContext):
@@ -155,6 +241,42 @@ async def category_open_for_edit(call: CallbackQuery, state: FSMContext):
                                 call.message.message_id,
                                 reply_markup=keyboard)
 
+################################################################################################
+####################################### ИЗМЕНЕНИЕ ПОДКАТЕГОРИЙ ####################################
+# Сделующая страница выбора категорий для редактирования
+@dp.callback_query_handler(IsAdmin(), text_startswith="edit_subcat_nextp", state="*")
+async def subcategory_edit_next_page(call: CallbackQuery, state: FSMContext):
+    remover = int(call.data.split(":")[1])
+
+    get_kb = subcategory_edit_next_page_ap(remover)
+    await bot.edit_message_text("<b>📜 Выберите категорию для изменения 🖍</b>",
+                                call.from_user.id,
+                                call.message.message_id,
+                                reply_markup=get_kb)
+
+
+# Предыдущая страница выбора категорий для редактирования
+@dp.callback_query_handler(IsAdmin(), text_startswith="edit_subcat_prevp", state="*")
+async def subcategory_edit_prev_page(call: CallbackQuery, state: FSMContext):
+    remover = int(call.data.split(":")[1])
+
+    get_kb = subcategory_edit_prev_page_ap(remover)
+    await bot.edit_message_text("<b>📜 Выберите категорию для изменения 🖍</b>",
+                                call.from_user.id,
+                                call.message.message_id,
+                                reply_markup=get_kb)
+# Выбор текущей подкатегории для редактирования
+@dp.callback_query_handler(IsAdmin(), text_startswith="edit_subcategory_here", state="*")
+async def subcategory_open_for_edit(call: CallbackQuery, state: FSMContext):
+    category_id = int(call.data.split(":")[1])
+    remover = int(call.data.split(":")[2])
+
+    messages, keyboard = edit_subcategory_func(category_id, remover)
+    await bot.edit_message_text(messages,
+                                call.from_user.id,
+                                call.message.message_id,
+                                reply_markup=keyboard)
+
 
 # Возвращение к списку выбора категорий для редактирования
 @dp.callback_query_handler(IsAdmin(), text_startswith="back_category_edit", state="*")
@@ -166,7 +288,85 @@ async def category_back_for_edit(call: CallbackQuery, state: FSMContext):
                                 call.from_user.id,
                                 call.message.message_id,
                                 reply_markup=get_kb)
+# Возвращение к списку выбора подкатегорий для редактирования
+@dp.callback_query_handler(IsAdmin(), text_startswith="back_subcategory_edit", state="*")
+async def category_back_for_edit(call: CallbackQuery, state: FSMContext):
+    remover = int(call.data.split(":")[1])
 
+    get_kb = subcategory_open_edit_ap(remover)
+    await bot.edit_message_text("<b>📜 Выберите категорию для изменения 🖍</b>",
+                                call.from_user.id,
+                                call.message.message_id,
+                                reply_markup=get_kb)
+
+# само изменение подкатегории
+@dp.callback_query_handler(IsAdmin(), text_startswith="subcategory_edit_name", state="*")
+async def subcategory_edit_name(call: CallbackQuery, state: FSMContext):
+    category_id = int(call.data.split(":")[1])
+    remover = int(call.data.split(":")[2])
+    async with state.proxy() as data:
+        data["here_cache_subcategory_id"] = category_id
+        data["here_cache_subcategory_remover"] = remover
+    await StorageSubCategory.here_change_subcategory_name.set()
+    await bot.delete_message(call.from_user.id, call.message.message_id)
+    await bot.send_message(call.from_user.id,
+                           "<b>🏷 Введите новое название для категории:</b>")
+
+
+# Принятие нового имени для категории
+@dp.message_handler(IsAdmin(), state=StorageSubCategory.here_change_subcategory_name)
+async def subcategory_name_was_changed(message: types.Message, state: FSMContext):
+    async with state.proxy() as data:
+        category_id = data["here_cache_subcategory_id"]
+        remover = data["here_cache_subcategory_remover"]
+    update_subcategoryx(category_id, subcategory_name=message.text)
+    await state.finish()
+    await message.answer("<b>📜 Название было успешно изменено ✅</b>",
+                         reply_markup=items_default)
+    messages, keyboard = edit_subcategory_func(category_id, remover)
+    await message.answer(messages, reply_markup=keyboard)
+
+
+# Окно с уточнением удалить категорию
+@dp.callback_query_handler(IsAdmin(), text_startswith="subcategory_remove", state="*")
+async def subcategory_remove(call: CallbackQuery, state: FSMContext):
+    category_id = int(call.data.split(":")[1])
+    remover = int(call.data.split(":")[2])
+    await bot.edit_message_text("<b>❗ Вы действительно хотите удалить категорию и все её данные?</b>",
+                                call.from_user.id,
+                                call.message.message_id,
+                                reply_markup=confirm_remove_func_sub(category_id, remover))
+
+
+# Отмена удаления категории
+@dp.callback_query_handler(IsAdmin(), text_startswith="not_remove_subcategory", state="*")
+async def subcategory_remove_cancel(call: CallbackQuery, state: FSMContext):
+    category_id = int(call.data.split(":")[1])
+    remover = int(call.data.split(":")[2])
+    messages, keyboard = edit_subcategory_func(category_id, remover)
+    await bot.edit_message_text(messages,
+                                call.from_user.id,
+                                call.message.message_id,
+                                reply_markup=keyboard)
+
+
+# Согласие на удаление категории
+@dp.callback_query_handler(IsAdmin(), text_startswith="yes_remove_subcategory", state="*")
+async def category_remove_confirm(call: CallbackQuery, state: FSMContext):
+    category_id = int(call.data.split(":")[1])
+    remover = int(call.data.split(":")[2])
+
+    remove_subcategoryx(subcategory_id=category_id)  # Удаление всех категорий
+    # remove_positionx(category_id=category_id)  # Удаление всех позиций
+    # remove_itemx(category_id=category_id)  # Удаление всех товаров
+
+    await bot.edit_message_text("<b>📜 Категория и все её данные были успешно удалены ✅</b>",
+                                call.from_user.id,
+                                call.message.message_id)
+    get_kb = subcategory_open_edit_ap(remover)
+    await bot.send_message(call.from_user.id,
+                           "<b>📜 Выберите категорию для изменения 🖍</b>",
+                           reply_markup=get_kb)
 
 ######################################## САМО ИЗМЕНЕНИЕ КАТЕГОРИИ ########################################
 # Изменение названия категории
@@ -259,15 +459,57 @@ async def category_remove_all_cancel(call: CallbackQuery, state: FSMContext):
                                 call.from_user.id,
                                 call.message.message_id)
 
+################################################################################################
+#################################### УДАЛЕНИЕ ВСЕХ ПОДКАТЕГОРИЙ ###################################
+# Согласие на удаление всех категорий (позиций и товаров включительно)
+@dp.callback_query_handler(IsAdmin(), text_startswith="confirm_clear_subcategory", state="*")
+async def subcategory_remove_all_confirm(call: CallbackQuery, state: FSMContext):
+    clear_subcategoryx()
+    clear_categoryx()
+    clear_positionx()
+    clear_itemx()
+    await bot.edit_message_text("<b>☑ Вы успешно удалили все категории, позиции и товары</b>",
+                                call.from_user.id,
+                                call.message.message_id)
+
+
+# Отмена удаления всех категорий (позиций и товаров включительно)
+@dp.callback_query_handler(IsAdmin(), text_startswith="cancel_clear_subcategory", state="*")
+async def subcategory_remove_all_cancel(call: CallbackQuery, state: FSMContext):
+    await bot.edit_message_text("<b>☑ Вы отменили удаление всех категорий ☑</b>",
+                                call.from_user.id,
+                                call.message.message_id)
 
 ################################################################################################
 ####################################### ДОБАВЛЕНИЕ ПОЗИЦИЙ #####################################
+# Сделующая страница выбора подкатегорий для создания позиций
+@dp.callback_query_handler(IsAdmin(), text_startswith="create_poscat_nextp", state="*")
+async def positioncat_next_page(call: CallbackQuery, state: FSMContext):
+    remover = int(call.data.split(":")[1])
+
+    get_kb = position_create_next_page_cat(remover)
+    await bot.edit_message_text("<b>📁 Выберите место для позиции ➕</b>",
+                                call.from_user.id,
+                                call.message.message_id,
+                                reply_markup=get_kb)
+
+
+# Предыдущая страница выбора категорий для создания позиций
+@dp.callback_query_handler(IsAdmin(), text_startswith="create_poscat_prevp", state="*")
+async def position_prev_page(call: CallbackQuery, state: FSMContext):
+    remover = int(call.data.split(":")[1])
+
+    get_kb = position_create_previous_page_cat(remover)
+    await bot.edit_message_text("<b>📁 Выберите место для позиции ➕</b>",
+                                call.from_user.id,
+                                call.message.message_id,
+                                reply_markup=get_kb)
 # Сделующая страница выбора категорий для создания позиций
 @dp.callback_query_handler(IsAdmin(), text_startswith="create_position_nextp", state="*")
 async def position_next_page(call: CallbackQuery, state: FSMContext):
     remover = int(call.data.split(":")[1])
-
-    get_kb = position_create_next_page_ap(remover)
+    subcategory_id = call.data.split(':')[2]
+    get_kb = position_create_next_page_ap(remover, subcategory_id)
     await bot.edit_message_text("<b>📁 Выберите место для позиции ➕</b>",
                                 call.from_user.id,
                                 call.message.message_id,
@@ -278,13 +520,73 @@ async def position_next_page(call: CallbackQuery, state: FSMContext):
 @dp.callback_query_handler(IsAdmin(), text_startswith="create_position_prevp", state="*")
 async def position_prev_page(call: CallbackQuery, state: FSMContext):
     remover = int(call.data.split(":")[1])
-
-    get_kb = position_create_previous_page_ap(remover)
+    subcategory_id = call.data.split(':')[2]
+    get_kb = position_create_previous_page_ap(remover, subcategory_id)
     await bot.edit_message_text("<b>📁 Выберите место для позиции ➕</b>",
                                 call.from_user.id,
                                 call.message.message_id,
                                 reply_markup=get_kb)
 
+# Выбор подкатегории для создания категории
+@dp.callback_query_handler(IsAdmin(), text_startswith="create_category_here", state="*")
+async def category_select_subcategory_for_create(call: CallbackQuery, state: FSMContext):
+    category_id = int(call.data.split(":")[1])
+    async with state.proxy() as data:
+        data["here_cache_change_subcategory_id"] = category_id
+    await StorageCategory.here_input_category_name.set()
+    await bot.delete_message(call.from_user.id, call.message.message_id)
+    await bot.send_message(call.from_user.id,
+                           "<b>📁 Введите название для категории 🏷</b>")
+# Принятие имени для создания позиции
+
+@dp.message_handler(IsAdmin(), state=StorageCategory.here_input_category_name)
+async def category_input_name(message: types.Message, state: FSMContext):
+    category_name = message.text
+    async with state.proxy() as data:
+        subcategory_id = data["here_cache_change_subcategory_id"]
+    category_id = [random.randint(100000000, 999999999)]
+    add_categoryx(category_id[0], category_name, subcategory_id)
+    await state.finish()
+    await message.answer("<b>📜 Категория была успешно создана ✅</b>",
+                         reply_markup=items_default)
+
+# Сделующая страница выбора подкатегорий для создания категории
+@dp.callback_query_handler(IsAdmin(), text_startswith="create_category_nextp", state="*")
+async def category_next_page(call: CallbackQuery, state: FSMContext):
+    remover = int(call.data.split(":")[1])
+
+    get_kb = category_create_next_page_ap(remover)
+    await bot.edit_message_text("<b>📁 Выберите место для позиции ➕</b>",
+                                call.from_user.id,
+                                call.message.message_id,
+                                reply_markup=get_kb)
+
+
+# Предыдущая страница выбора категорий для создания позиций
+@dp.callback_query_handler(IsAdmin(), text_startswith="create_category_prevp", state="*")
+async def category_prev_page(call: CallbackQuery, state: FSMContext):
+    remover = int(call.data.split(":")[1])
+
+    get_kb = category_create_previous_page_ap(remover)
+    await bot.edit_message_text("<b>📁 Выберите место для позиции ➕</b>",
+                                call.from_user.id,
+                                call.message.message_id,
+                                reply_markup=get_kb)
+
+# Выбор подкатегории для создания позиции
+@dp.callback_query_handler(IsAdmin(), text_startswith="create_poscat_here", state="*")
+async def position_select_category_for_create(call: CallbackQuery, state: FSMContext):
+    subcategory_id = int(call.data.split(":")[1])
+
+    get_subcategory = get_subcategoryx("*", subcategory_id=subcategory_id)
+    get_category = get_categoryx("*", subcategory_id=subcategory_id)
+
+    get_kb = position_open_create_ap(0, subcategory_id)
+    if get_category is not None:
+        await call.message.edit_text("<b>🎁 Выберите нужный вам товар:</b>",
+                                     reply_markup=get_kb)
+    else:
+        await call.answer(f"❕ Товары в категории {get_subcategory[2]} отсутствуют.")
 
 # Выбор категории для создания позиции
 @dp.callback_query_handler(IsAdmin(), text_startswith="create_position_here", state="*")
@@ -383,12 +685,61 @@ async def position_get_image(message: types.Message, state: FSMContext):
 # Возвращение к начальным категориям для изменения позиции
 @dp.callback_query_handler(IsAdmin(), text_startswith="back_to_category", state="*")
 async def back_to_all_categories_for_edit_position(call: CallbackQuery, state: FSMContext):
-    get_kb = position_open_edit_category_ap(0)
+    get_kb = position_open_edit_category_cat(0)
 
     await bot.edit_message_text("<b>📁 Выберите категорию с нужной вам позицией 🖍</b>",
                                 call.from_user.id,
                                 call.message.message_id,
                                 reply_markup=get_kb)
+
+
+# Сделующая страница выбора категории с позицией для редактирования
+@dp.callback_query_handler(IsAdmin(), text_startswith="edit_position_subcat_nextp", state="*")
+async def next_page_category_for_edit_position(call: CallbackQuery, state: FSMContext):
+    remover = int(call.data.split(":")[1])
+
+    get_kb = position_edit_next_page_category_cat(remover)
+    await bot.edit_message_text("<b>📁 Выберите категорию с нужной вам позицией 🖍</b>",
+                                call.from_user.id,
+                                call.message.message_id,
+                                reply_markup=get_kb)
+
+
+# Предыдущая страница выбора категории с позицией для редактирования
+@dp.callback_query_handler(IsAdmin(), text_startswith="edit_position_subcat_prevp", state="*")
+async def previous_page_category_for_edit_position(call: CallbackQuery, state: FSMContext):
+    remover = int(call.data.split(":")[1])
+
+    get_kb = position_edit_previous_page_category_cat(remover)
+    await bot.edit_message_text("<b>📁 Выберите категорию с нужной вам позицией 🖍</b>",
+                                call.from_user.id,
+                                call.message.message_id,
+                                reply_markup=get_kb)
+
+# Выбор категории с нужной позицией
+@dp.callback_query_handler(IsAdmin(), text_startswith="position_edit_subcat", state="*")
+async def open_category_for_edit_position(call: CallbackQuery, state: FSMContext):
+    category_id = int(call.data.split(":")[1])
+
+    # get_positions = get_positionsx("*", category_id=category_id)
+    get_category = get_categoryx("*", subcategory_id=category_id)
+    if len(get_category) >= 1:
+        get_kb = position_open_edit_category_ap(0, category_id)
+        await bot.edit_message_text("<b>📁 Выберите нужную вам позицию 🖍</b>",
+                                    call.from_user.id,
+                                    call.message.message_id,
+                                    reply_markup=get_kb)
+    else:
+        await bot.answer_callback_query(call.id, "📁 Позиции в данной категории отсутствуют")
+# # Возвращение к начальным категориям для изменения позиции
+# @dp.callback_query_handler(IsAdmin(), text_startswith="back_to_category", state="*")
+# async def back_to_all_categories_for_edit_position(call: CallbackQuery, state: FSMContext):
+#     get_kb = position_open_edit_category_ap(0)
+#
+#     await bot.edit_message_text("<b>📁 Выберите категорию с нужной вам позицией 🖍</b>",
+#                                 call.from_user.id,
+#                                 call.message.message_id,
+#                                 reply_markup=get_kb)
 
 
 # Сделующая страница выбора категории с позицией для редактирования
@@ -818,6 +1169,56 @@ async def create_input_position_name(call: CallbackQuery, state: FSMContext):
 
 ################################################################################################
 ####################################### ДОБАВЛЕНИЕ ТОВАРОВ #####################################
+
+# Возвращение к начальным подкатегориям для добавления товаров
+@dp.callback_query_handler(IsAdmin(), text_startswith="back_add_item_to_subcat", state="*")
+async def back_to_all_categories_for_add_item(call: CallbackQuery, state: FSMContext):
+    get_kb = item_open_add_category_cat(0)
+
+    await bot.edit_message_text("<b>🎁 Выберите категорию с нужной вам позицией ➕</b>",
+                                call.from_user.id,
+                                call.message.message_id,
+                                reply_markup=get_kb)
+
+
+# Сделующая страница выбора категории с позицией для добавления товаров
+@dp.callback_query_handler(IsAdmin(), text_startswith="add_item_subcat_nextp", state="*")
+async def next_page_category_for_edit_position(call: CallbackQuery, state: FSMContext):
+    remover = int(call.data.split(":")[1])
+
+    get_kb = item_add_next_page_category_cat(remover)
+    await bot.edit_message_text("<b>🎁 Выберите категорию с нужной вам позицией ➕</b>",
+                                call.from_user.id,
+                                call.message.message_id,
+                                reply_markup=get_kb)
+
+
+# Предыдущая страница выбора категории с позицией для добавления товаров
+@dp.callback_query_handler(IsAdmin(), text_startswith="add_item_subcat_prevp", state="*")
+async def previous_page_category_for_edit_position(call: CallbackQuery, state: FSMContext):
+    remover = int(call.data.split(":")[1])
+
+    get_kb = item_add_previous_page_category_ap(remover)
+    await bot.edit_message_text("<b>🎁 Выберите категорию с нужной вам позицией ➕</b>",
+                                call.from_user.id,
+                                call.message.message_id,
+                                reply_markup=get_kb)
+
+
+# Выбор категории с нужной позицией
+@dp.callback_query_handler(IsAdmin(), text_startswith="item_add_subcat", state="*")
+async def open_category_for_edit_position(call: CallbackQuery, state: FSMContext):
+    category_id = int(call.data.split(":")[1])
+    get_categories = get_categoryx("*", subcategory_id=category_id)
+    if get_categories is not None:
+        get_kb = item_open_add_category_ap(0, category_id)
+        await bot.edit_message_text("<b>🎁 Выберите нужную вам позицию ➕</b>",
+                                    call.from_user.id,
+                                    call.message.message_id,
+                                    reply_markup=get_kb)
+    else:
+        await bot.answer_callback_query(call.id, "🎁 Позиции в данной категории отсутствуют")
+
 # Возвращение к начальным категориям для добавления товаров
 @dp.callback_query_handler(IsAdmin(), text_startswith="back_add_item_to_category", state="*")
 async def back_to_all_categories_for_add_item(call: CallbackQuery, state: FSMContext):

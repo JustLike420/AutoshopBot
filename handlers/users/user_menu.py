@@ -20,10 +20,11 @@ def split_messages(get_list, count):
 @dp.message_handler(text="🎁 Купить", state="*")
 async def show_search(message: types.Message, state: FSMContext):
     await state.finish()
-    get_categories = get_all_categoriesx()
-    if len(get_categories) >= 1:
-        get_kb = buy_item_open_category_ap(0)
-        await message.answer("<b>🎁 Выберите нужный вам товар:</b>", reply_markup=get_kb)
+    # get_categories = get_all_categoriesx()
+    get_subcategories = get_all_subcategoriesx()
+    if len(get_subcategories) >= 1:
+        get_kb = buy_item_open_subcategory_ap(0)
+        await message.answer("<b>🎁 Выберите нужную вам категорию:</b>", reply_markup=get_kb)
     else:
         await message.answer("<b>🎁 Товары в данное время отсутствуют.</b>")
 
@@ -94,6 +95,49 @@ async def show_referral(call: CallbackQuery, state: FSMContext):
 
 ################################################################################################
 ######################################### ПОКУПКА ТОВАРА #######################################
+# ПОДКАТЕГОРИИ
+# Открытие подкатегории для покупки
+@dp.callback_query_handler(text_startswith="buy_open_subcategory", state="*")
+async def open_subcategory_for_buy_item(call: CallbackQuery, state: FSMContext):
+    subcategory_id = int(call.data.split(":")[1])
+
+    get_subcategory = get_subcategoryx("*", subcategory_id=subcategory_id)
+    get_category = get_categoryx("*", subcategory_id=subcategory_id)
+
+    get_kb = buy_item_open_category_ap(0, subcategory_id)
+    if get_category is not None:
+        await call.message.edit_text("<b>🎁 Выберите нужную вам категорию:</b>",
+                                     reply_markup=get_kb)
+    else:
+        await call.answer(f"❕ Товары в категории {get_subcategory[2]} отсутствуют.")
+
+
+# Вернуться к предыдущей подкатегории при покупке
+@dp.callback_query_handler(text_startswith="back_buy_item_to_subcategory", state="*")
+async def back_category_for_buy_item(call: CallbackQuery, state: FSMContext):
+    await call.message.edit_text("<b>🎁 Выберите нужную вам категорию:</b>",
+                                 reply_markup=buy_item_open_subcategory_ap(0))
+
+
+# Следующая страница подкатегорий при покупке
+@dp.callback_query_handler(text_startswith="buy_subcategory_nextp", state="*")
+async def buy_item_next_page_category(call: CallbackQuery, state: FSMContext):
+    remover = int(call.data.split(":")[1])
+    # category_id = call.data.split(":")[2]
+    await call.message.edit_text("<b>🎁 Выберите нужную вам категорию:</b>",
+                                 reply_markup=buy_item_next_page_subcategory_ap(remover))
+
+
+# Предыдущая страница подкатегорий при покупке
+@dp.callback_query_handler(text_startswith="buy_subcategory_prevp", state="*")
+async def buy_item_prev_page_category(call: CallbackQuery, state: FSMContext):
+    remover = int(call.data.split(":")[1])
+
+    await call.message.edit_text("<b>🎁 Выберите нужную вам категорию:</b>",
+                                 reply_markup=buy_item_previous_page_subcategory_ap(remover))
+
+
+# КАТЕГОРИИ
 # Открытие категории для покупки
 @dp.callback_query_handler(text_startswith="buy_open_category", state="*")
 async def open_category_for_buy_item(call: CallbackQuery, state: FSMContext):
@@ -112,27 +156,37 @@ async def open_category_for_buy_item(call: CallbackQuery, state: FSMContext):
 # Вернутсья к предыдущей категории при покупке
 @dp.callback_query_handler(text_startswith="back_buy_item_to_category", state="*")
 async def back_category_for_buy_item(call: CallbackQuery, state: FSMContext):
+    category_id = call.data.split(':')[1]
+    cat = get_categoriesx("*", category_id=category_id)
+    # найти айди сабкаггетории по категории
+    subcategory_id = cat[0][3]
     await call.message.edit_text("<b>🎁 Выберите нужный вам товар:</b>",
-                                 reply_markup=buy_item_open_category_ap(0))
+                                 reply_markup=buy_item_open_category_ap(0, subcategory_id))
 
 
 # Следующая страница категорий при покупке
 @dp.callback_query_handler(text_startswith="buy_category_nextp", state="*")
 async def buy_item_next_page_category(call: CallbackQuery, state: FSMContext):
     remover = int(call.data.split(":")[1])
-
+    subcategory_id = call.data.split(':')[2]
+    # cat = get_categoriesx("*", category_id=category_id)
+    # subcategory_id = cat[0][3]
     await call.message.edit_text("<b>🎁 Выберите нужный вам товар:</b>",
-                                 reply_markup=buy_item_next_page_category_ap(remover))
+                                 reply_markup=buy_item_next_page_category_ap(remover, subcategory_id))
 
 
 # Предыдущая страница категорий при покупке
 @dp.callback_query_handler(text_startswith="buy_category_prevp", state="*")
 async def buy_item_prev_page_category(call: CallbackQuery, state: FSMContext):
     remover = int(call.data.split(":")[1])
-
+    subcategory_id = call.data.split(':')[2]
+    # cat = get_categoriesx("*", category_id=category_id)
+    # subcategory_id = cat[0][3]
     await call.message.edit_text("<b>🎁 Выберите нужный вам товар:</b>",
-                                 reply_markup=buy_item_previous_page_category_ap(remover))
+                                 reply_markup=buy_item_previous_page_category_ap(remover, subcategory_id))
 
+
+# ПОЗИЦИИ
 
 # Следующая страница позиций при покупке
 @dp.callback_query_handler(text_startswith="buy_position_nextp", state="*")
@@ -175,10 +229,12 @@ async def open_category_for_create_position(call: CallbackQuery, state: FSMConte
     get_position = get_positionx("*", position_id=position_id)
     get_category = get_categoryx("*", category_id=category_id)
     get_items = get_itemsx("*", position_id=position_id)
+    get_subcategory = get_subcategoryx("*", subcategory_id=get_category[3])
 
     send_msg = f"<b>🎁 Покупка товара:</b>\n" \
                f"➖➖➖➖➖➖➖➖➖➖➖➖➖\n" \
-               f"<b>📜 Категория:</b> <code>{get_category[2]}</code>\n" \
+               f"<b>📜 Категория:</b> <code>{get_subcategory[2]}</code>\n" \
+               f"<b>📜 Под категория:</b> <code>{get_category[2]}</code>\n" \
                f"<b>🏷 Название:</b> <code>{get_position[2]}</code>\n" \
                f"<b>💵 Стоимость:</b> <code>{get_position[3]}руб</code>\n" \
                f"<b>📦 Количество:</b> <code>{len(get_items)}шт</code>\n" \

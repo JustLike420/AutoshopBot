@@ -1,7 +1,7 @@
 # - *- coding: utf- 8 - *-
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
-from utils.db_api.sqlite import get_paymentx, get_positionx, get_itemsx, get_positionsx, get_categoryx
+from utils.db_api.sqlite import get_paymentx, get_positionx, get_itemsx, get_positionsx, get_categoryx, get_subcategoryx
 
 
 # Поиск профиля
@@ -56,12 +56,32 @@ def edit_category_func(category_id, remover):
                                           callback_data=f"category_edit_name:{category_id}:{remover}")
     remove_kb = InlineKeyboardButton(text="❌ Удалить",
                                      callback_data=f"category_remove:{category_id}:{remover}")
+    # back_category_kb = InlineKeyboardButton("⬅ Вернуться ↩",
+    #                                         callback_data=f"back_category_edit:{remover}")
+    category_keyboard.add(change_name_kb, remove_kb)
+    # category_keyboard.add(back_category_kb)
+    return messages, category_keyboard
+
+# Изменение подкатегории
+def edit_subcategory_func(category_id, remover):
+    category_keyboard = InlineKeyboardMarkup()
+    # get_fat_count = len(get_positionsx("*", category_id=category_id))
+    get_category = get_subcategoryx("*", subcategory_id=category_id)
+
+    messages = "<b>📜 Выберите действие с категорией 🖍</b>\n" \
+               "➖➖➖➖➖➖➖➖➖➖➖➖➖➖➖\n" \
+               f"🏷 Название: <code>{get_category[2]}</code>\n"
+
+
+    change_name_kb = InlineKeyboardButton(text="🏷 Изменить название",
+                                          callback_data=f"subcategory_edit_name:{category_id}:{remover}")
+    remove_kb = InlineKeyboardButton(text="❌ Удалить",
+                                     callback_data=f"subcategory_remove:{category_id}:{remover}")
     back_category_kb = InlineKeyboardButton("⬅ Вернуться ↩",
-                                            callback_data=f"back_category_edit:{remover}")
+                                            callback_data=f"back_subcategory_edit:{remover}")
     category_keyboard.add(change_name_kb, remove_kb)
     category_keyboard.add(back_category_kb)
     return messages, category_keyboard
-
 
 # Кнопки с удалением категории
 def confirm_remove_func(category_id, remover):
@@ -73,6 +93,14 @@ def confirm_remove_func(category_id, remover):
     confirm_remove_keyboard.add(change_name_kb, move_kb)
     return confirm_remove_keyboard
 
+def confirm_remove_func_sub(category_id, remover):
+    confirm_remove_keyboard = InlineKeyboardMarkup()
+    change_name_kb = InlineKeyboardButton(text="❌ Да, удалить",
+                                          callback_data=f"yes_remove_subcategory:{category_id}:{remover}")
+    move_kb = InlineKeyboardButton(text="✅ Нет, отменить",
+                                   callback_data=f"not_remove_subcategory:{category_id}:{remover}")
+    confirm_remove_keyboard.add(change_name_kb, move_kb)
+    return confirm_remove_keyboard
 
 # Кнопки при открытии позиции для изменения
 def open_edit_position_func(position_id, category_id, remover):

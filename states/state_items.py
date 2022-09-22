@@ -1,6 +1,12 @@
 # - *- coding: utf- 8 - *-
 from aiogram.dispatcher.filters.state import State, StatesGroup
 
+class StorageSubCategory(StatesGroup):
+    here_change_subcategory_name = State()
+    here_input_subcategory_name = State()
+
+    here_cache_subcategory_id = State()
+    here_cache_subcategory_remover = State()
 
 class StorageCategory(StatesGroup):
     here_change_category_name = State()
