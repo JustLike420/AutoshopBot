@@ -128,6 +128,38 @@ def update_paymentx(**kwargs):
         db.commit()
 
 
+def add_qiwi_payment(qiwi_login, qiwi_token,
+                     qiwi_private_key, type):
+    with sqlite3.connect(path_to_db) as db:
+        db.execute("INSERT INTO storage_qiwi "
+                   "(qiwi_login, qiwi_token, qiwi_private_key, type) "
+                   "VALUES (?, ?, ?, ?)",
+                   [qiwi_login, qiwi_token, qiwi_private_key, type])
+        db.commit()
+
+
+# Получение платежных систем
+def get_qiwi_paymentx():
+    with sqlite3.connect(path_to_db) as db:
+        get_response = db.execute("SELECT * FROM storage_qiwi")
+        get_response = get_response.fetchall()
+    return get_response
+
+# def get_qiwi_wallet(**kwargs):
+#     with sqlite3.connect(path_to_db) as db:
+#         sql = f"SELECT * FROM storage_qiwi WHERE "
+#         sql, parameters = get_format_args(sql, kwargs)
+#         get_response = db.execute(sql, parameters)
+#         get_response = get_response.fetchone()
+#         get_response = get_response.nex
+#     return get_response
+
+def delete_qiwi_wallet(**kwargs):
+    with sqlite3.connect(path_to_db) as db:
+        sql = "DELETE FROM storage_qiwi WHERE "
+        sql, parameters = get_format_args(sql, kwargs)
+        db.execute(sql, parameters)
+        db.commit()
 # Получение настроек
 def get_settingsx():
     with sqlite3.connect(path_to_db) as db:
@@ -277,12 +309,14 @@ def clear_categoryx():
         db.execute(sql)
         db.commit()
 
+
 # Очистка подкатегорий
 def clear_subcategoryx():
     with sqlite3.connect(path_to_db) as db:
         sql = "DELETE FROM storage_subcategory"
         db.execute(sql)
         db.commit()
+
 
 # Удаление товаров
 def remove_categoryx(**kwargs):
@@ -292,6 +326,7 @@ def remove_categoryx(**kwargs):
         db.execute(sql, parameters)
         db.commit()
 
+
 # Удаление подкатегории
 def remove_subcategoryx(**kwargs):
     with sqlite3.connect(path_to_db) as db:
@@ -299,6 +334,7 @@ def remove_subcategoryx(**kwargs):
         sql, parameters = get_format_args(sql, kwargs)
         db.execute(sql, parameters)
         db.commit()
+
 
 # Добавление категории в БД
 def add_positionx(position_id, position_name, position_price, position_discription, position_image, position_date,
@@ -527,20 +563,32 @@ def create_bdx():
         check_sql = db.execute("PRAGMA table_info(storage_payment)")
         check_sql = check_sql.fetchall()
         check_create_payment = [c for c in check_sql]
-        if len(check_create_payment) == 6:
+        if len(check_create_payment) == 7:
             print("DB was found(2/8)")
         else:
             db.execute("CREATE TABLE storage_payment("
                        "qiwi_login TEXT, qiwi_token TEXT, "
                        "qiwi_private_key TEXT, qiwi_nickname TEXT, "
-                       "way_payment TEXT, status TEXT)")
+                       "way_payment TEXT, status TEXT, type TEXT)")
             db.execute("INSERT INTO storage_payment("
                        "qiwi_login, qiwi_token, "
                        "qiwi_private_key, qiwi_nickname, "
-                       "way_payment, status) "
-                       "VALUES (?, ?, ?, ?, ?, ?)",
-                       ["None", "None", "None", "None", "form", "False"])
+                       "way_payment, status, type) "
+                       "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                       ["None", "None", "None", "None", "form", "False", "1"])
             print("DB was not found(2/8) | Creating...")
+
+        # Создание БД с хранением кошельков
+        check_sql = db.execute("PRAGMA table_info(storage_qiwi)")
+        check_sql = check_sql.fetchall()
+        check_create_payment = [c for c in check_sql]
+        if len(check_create_payment) == 5:
+            print("DB was found(2.5/8)")
+        else:
+            db.execute("CREATE TABLE storage_qiwi("
+                       "qiwi_login TEXT, qiwi_token TEXT, "
+                       "qiwi_private_key TEXT, type TEXT, increment INTEGER PRIMARY KEY AUTOINCREMENT)")
+            print("DB was not found(2.5/8) | Creating...")
 
         # Создание БД с хранением настроек
         check_sql = db.execute("PRAGMA table_info(storage_settings)")

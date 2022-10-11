@@ -14,7 +14,7 @@ from keyboards.inline import *
 from loader import dp, bot
 from states.state_payment import StorageQiwi
 from utils import send_all_admin, clear_firstname, get_dates
-from utils.db_api.sqlite import update_userx, get_refillx, add_refillx
+from utils.db_api.sqlite import update_userx, get_refillx, add_refillx, get_qiwi_paymentx, update_paymentx
 
 
 ###################################################################################
@@ -194,6 +194,18 @@ async def check_qiwi_pay(call: CallbackQuery):
                              balance=int(get_user_info[4]) + pay_amount,
                              all_refill=int(get_user_info[5]) + pay_amount)
 
+                wallet = get_paymentx()
+                new_wallet = ()
+                get_qiwi = get_qiwi_paymentx()
+                i = 0
+                for qiwi in get_qiwi:
+                    if qiwi[0] == wallet[0]:
+                        if i == len(get_qiwi) - 1:
+                            new_wallet = get_qiwi[0]
+                        else:
+                            new_wallet = get_qiwi[i + 1]
+                update_paymentx(qiwi_login=new_wallet[0], qiwi_token=new_wallet[1],
+                                qiwi_private_key=[2], type='2')
                 await bot.delete_message(call.message.chat.id, message_id)
                 await call.message.delete()
                 await call.message.answer(f"<b>✅ Вы успешно пополнили баланс на сумму {pay_amount}руб. Удачи ❤</b>\n"

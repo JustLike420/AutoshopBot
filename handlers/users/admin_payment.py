@@ -1,6 +1,7 @@
 # - *- coding: utf- 8 - *-
 import asyncio
 import json
+from itertools import cycle
 
 import requests
 from aiogram import types
@@ -14,7 +15,8 @@ from keyboards.inline import choice_way_input_payment_func
 from loader import dp, bot
 from states import StorageQiwi
 from utils import send_all_admin, clear_firstname
-from utils.db_api.sqlite import get_paymentx, update_paymentx
+from utils.db_api.sqlite import get_paymentx, update_paymentx, add_qiwi_payment, get_qiwi_paymentx, delete_qiwi_wallet
+from utils.other_func import validation, withdraw
 
 
 ###################################################################################
@@ -82,7 +84,7 @@ async def input_amount(call: CallbackQuery):
 ###################################################################################
 ####################################### QIWI ######################################
 # Изменение QIWI кошелька
-@dp.message_handler(IsAdmin(), text="🥝 Изменить QIWI 🖍", state="*")
+@dp.message_handler(IsAdmin(), text="🥝 Добавить QIWI 🖍", state="*")
 async def change_qiwi_login(message: types.Message, state: FSMContext):
     await state.finish()
     await message.answer("<b>🥝 Введите</b> <code>логин(номер)</code> <b>QIWI кошелька🖍 </b>")
@@ -171,11 +173,24 @@ async def change_secret_api(message: types.Message, state: FSMContext):
 # Принятие приватного ключа для киви
 @dp.message_handler(IsAdmin(), state=StorageQiwi.here_input_qiwi_secret)
 async def change_secret_api(message: types.Message, state: FSMContext):
+    async with state.proxy() as data:
+        data["here_input_qiwi_secret"] = message.text
+    await message.answer("Выберите тип qiwi:\n"
+                         "<b>1 - Основной(вывод)</b>\n"
+                         "<b>2 - Второстепенный(прием)</b>\n"
+                         "Напишите цифру.",
+                         disable_web_page_preview=True)
+    await StorageQiwi.here_input_qiwi_type.set()
+
+
+@dp.message_handler(IsAdmin(), state=StorageQiwi.here_input_qiwi_type)
+async def change_type_qiwi(message: types.Message, state: FSMContext):
     secrey_key_error = False
     async with state.proxy() as data:
         qiwi_login = data["here_input_qiwi_login"]
         qiwi_token = data["here_input_qiwi_token"]
-    qiwi_private_key = message.text
+        qiwi_private_key = data["here_input_qiwi_secret"]
+    qiwi_type = message.text
     delete_msg = await message.answer("<b>🥝 Проверка введённых QIWI данных... 🔄</b>")
     await asyncio.sleep(0.5)
     try:
@@ -191,11 +206,30 @@ async def change_secret_api(message: types.Message, state: FSMContext):
             check_balance = request.get(f"https://edge.qiwi.com/funding-sources/v2/persons/{qiwi_login}/accounts")
             try:
                 if check_history.status_code == 200 and check_profile.status_code == 200 and check_balance.status_code == 200:
-                    update_paymentx(qiwi_login=qiwi_login, qiwi_token=qiwi_token,
-                                    qiwi_private_key=qiwi_private_key)
-                    await delete_msg.delete()
-                    await message.answer("<b>🥝 QIWI токен был успешно изменён ✅</b>",
-                                         reply_markup=payment_default())
+                    if qiwi_type == '1':
+
+                        # update_paymentx(qiwi_login=qiwi_login, qiwi_token=qiwi_token,
+                        #                 qiwi_private_key=qiwi_private_key)
+                        add_qiwi_payment(qiwi_login=qiwi_login, qiwi_token=qiwi_token,
+                                         qiwi_private_key=qiwi_private_key, type=qiwi_type)
+                        await delete_msg.delete()
+                        await message.answer("<b>🥝 Основной QIWI был успешно добавлен ✅</b>",
+                                             reply_markup=payment_default())
+                    elif qiwi_type == '2':
+                        add_qiwi_payment(qiwi_login=qiwi_login, qiwi_token=qiwi_token,
+                                         qiwi_private_key=qiwi_private_key, type=qiwi_type)
+                        await delete_msg.delete()
+                        await message.answer("<b>🥝 Второстепенный QIWI был успешно добавлен ✅</b>",
+                                             reply_markup=payment_default())
+                    else:
+                        await delete_msg.delete()
+                        await message.answer(f"Ошибка.",
+                                             reply_markup=payment_default())
+                    payments = get_paymentx()
+                    if payments[0] == 'None':
+                        update_paymentx(qiwi_login=qiwi_login, qiwi_token=qiwi_token,
+                                        qiwi_private_key=qiwi_private_key, type=qiwi_type)
+
                 elif check_history.status_code == 400 or check_profile.status_code == 400 or check_balance.status_code == 400:
                     await delete_msg.delete()
                     await message.answer(f"<b>🥝 Введённые QIWI данные не прошли проверку ❌</b>\n"
@@ -253,3 +287,52 @@ async def change_secret_api(message: types.Message, state: FSMContext):
                              "❕ Секретный ключ заканчивается на =",
                              reply_markup=payment_default())
     await state.finish()
+
+
+@dp.message_handler(IsAdmin(), text="Просмотр кошельков", state="*")
+async def check_wallets(message: types.Message, state: FSMContext):
+    await state.finish()
+    all_qiwi = get_qiwi_paymentx()
+    print(all_qiwi)
+    text = ''
+    for qiwi_wallet in all_qiwi:
+        check, balance = validation(qiwi_wallet)
+        if qiwi_wallet[3] == '1':
+            wallet_text = '1️⃣ ' + qiwi_wallet[0] + f' {balance}₽ '
+        else:
+            wallet_text = '2️⃣ ' + qiwi_wallet[0] + f' {balance}₽ '
+        if check:
+            text += wallet_text + ' ✅\n'
+        else:
+            text += wallet_text + ' ❌\n'
+    await message.answer(text,
+                         reply_markup=payment_default())
+
+
+@dp.message_handler(IsAdmin(), text="Вывод", state="*")
+async def withdraw_balance(message: types.Message, state: FSMContext):
+    await state.finish()
+    all_qiwi = get_qiwi_paymentx()
+    main_qiwi_list = [wallet[0] for wallet in all_qiwi if wallet[3] == '1']
+    second_qiwi_list = [(wallet[0], wallet[1]) for wallet in all_qiwi if wallet[3] == '2']
+    if len(main_qiwi_list) == 0:
+        await message.answer("Не хватает основного кошелька")
+    elif len(second_qiwi_list) == 0:
+        await message.answer("Не хватает второстепенного кошелька")
+    else:
+        text = withdraw(cycle(main_qiwi_list), second_qiwi_list)
+        await message.answer(text)
+
+
+@dp.message_handler(IsAdmin(), text="Удалить кошелек", state="*")
+async def delete_wallet(message: types.Message, state: FSMContext):
+    await state.finish()
+    await message.answer("<b>🥝 Введите</b> <code>логин(номер)</code> <b>QIWI кошелька🖍 </b>")
+    await state.set_state("delete_wallet")
+
+
+@dp.message_handler(IsAdmin(), state="delete_wallet")
+async def change_key_api(message: types.Message, state: FSMContext):
+    wallet_login = str(message.text)
+    delete_qiwi_wallet(qiwi_login=wallet_login)
+    await message.answer(f"{wallet_login} Удален.")
