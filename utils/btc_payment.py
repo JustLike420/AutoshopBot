@@ -35,7 +35,7 @@ class BitcoinPay:
     @staticmethod
     def get_satoshi(amount: float) -> int:
         """получение из суммы сатоши"""
-        amount = int(amount * 10 ** 8)
+        amount = int(format(amount * 10**8, '.0f'))
         return amount
 
 # пример
