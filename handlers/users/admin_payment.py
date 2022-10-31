@@ -84,13 +84,26 @@ async def input_amount(call: CallbackQuery):
 ###################################################################################
 ####################################### QIWI ######################################
 # Изменение QIWI кошелька
-@dp.message_handler(IsAdmin(), text="🥝 Добавить QIWI 🖍", state="*")
+@dp.message_handler(IsAdmin(), text="🥝 Добавить QIWI 2", state="*")
 async def change_qiwi_login(message: types.Message, state: FSMContext):
     await state.finish()
-    await message.answer("<b>🥝 Введите</b> <code>логин(номер)</code> <b>QIWI кошелька🖍 </b>")
+    await message.answer("<b>🥝 Введите</b> <code>логин(номер)</code> <b>QIWI кошелька 2️⃣</b>")
     await StorageQiwi.here_input_qiwi_login.set()
 
+@dp.message_handler(IsAdmin(), text="🥝 Добавить QIWI 1", state="*")
+async def change_qiwi_login1(message: types.Message, state: FSMContext):
+    await state.finish()
+    await message.answer("<b>🥝 Введите</b> <code>логин(номер)</code> <b>QIWI кошелька 1️</b>")
+    await state.set_state("here_qiwi1_input")
 
+
+@dp.message_handler(IsAdmin(), state="here_qiwi1_input")
+async def change_qiwi__login1(message: types.Message, state: FSMContext):
+    number = str(message.text)
+    await message.answer(f"QIWI кошелька 1️ {number} добавлен")
+    add_qiwi_payment(qiwi_login=number, qiwi_token='',
+                     qiwi_private_key='', type='1')
+    await state.finish()
 # Проверка работоспособности QIWI
 @dp.message_handler(IsAdmin(), text="🥝 Проверить QIWI ♻", state="*")
 async def check_qiwi(message: types.Message, state: FSMContext):
@@ -171,26 +184,25 @@ async def change_secret_api(message: types.Message, state: FSMContext):
 
 
 # Принятие приватного ключа для киви
+# @dp.message_handler(IsAdmin(), state=StorageQiwi.here_input_qiwi_secret)
+# async def change_secret_api(message: types.Message, state: FSMContext):
+#     async with state.proxy() as data:
+#         data["here_input_qiwi_secret"] = message.text
+#     await message.answer("Выберите тип qiwi:\n"
+#                          "<b>1 - Основной(вывод)</b>\n"
+#                          "<b>2 - Второстепенный(прием)</b>\n"
+#                          "Напишите цифру.",
+#                          disable_web_page_preview=True)
+#     await StorageQiwi.here_input_qiwi_type.set()
+
+
 @dp.message_handler(IsAdmin(), state=StorageQiwi.here_input_qiwi_secret)
 async def change_secret_api(message: types.Message, state: FSMContext):
-    async with state.proxy() as data:
-        data["here_input_qiwi_secret"] = message.text
-    await message.answer("Выберите тип qiwi:\n"
-                         "<b>1 - Основной(вывод)</b>\n"
-                         "<b>2 - Второстепенный(прием)</b>\n"
-                         "Напишите цифру.",
-                         disable_web_page_preview=True)
-    await StorageQiwi.here_input_qiwi_type.set()
-
-
-@dp.message_handler(IsAdmin(), state=StorageQiwi.here_input_qiwi_type)
-async def change_type_qiwi(message: types.Message, state: FSMContext):
+    qiwi_private_key = message.text
     secrey_key_error = False
     async with state.proxy() as data:
         qiwi_login = data["here_input_qiwi_login"]
         qiwi_token = data["here_input_qiwi_token"]
-        qiwi_private_key = data["here_input_qiwi_secret"]
-    qiwi_type = message.text
     delete_msg = await message.answer("<b>🥝 Проверка введённых QIWI данных... 🔄</b>")
     await asyncio.sleep(0.5)
     try:
@@ -206,29 +218,18 @@ async def change_type_qiwi(message: types.Message, state: FSMContext):
             check_balance = request.get(f"https://edge.qiwi.com/funding-sources/v2/persons/{qiwi_login}/accounts")
             try:
                 if check_history.status_code == 200 and check_profile.status_code == 200 and check_balance.status_code == 200:
-                    if qiwi_type == '1':
 
-                        # update_paymentx(qiwi_login=qiwi_login, qiwi_token=qiwi_token,
-                        #                 qiwi_private_key=qiwi_private_key)
-                        add_qiwi_payment(qiwi_login=qiwi_login, qiwi_token=qiwi_token,
-                                         qiwi_private_key=qiwi_private_key, type=qiwi_type)
-                        await delete_msg.delete()
-                        await message.answer("<b>🥝 Основной QIWI был успешно добавлен ✅</b>",
-                                             reply_markup=payment_default())
-                    elif qiwi_type == '2':
-                        add_qiwi_payment(qiwi_login=qiwi_login, qiwi_token=qiwi_token,
-                                         qiwi_private_key=qiwi_private_key, type=qiwi_type)
-                        await delete_msg.delete()
-                        await message.answer("<b>🥝 Второстепенный QIWI был успешно добавлен ✅</b>",
-                                             reply_markup=payment_default())
-                    else:
-                        await delete_msg.delete()
-                        await message.answer(f"Ошибка.",
-                                             reply_markup=payment_default())
+                    # update_paymentx(qiwi_login=qiwi_login, qiwi_token=qiwi_token,
+                    #                 qiwi_private_key=qiwi_private_key)
+                    add_qiwi_payment(qiwi_login=qiwi_login, qiwi_token=qiwi_token,
+                                     qiwi_private_key=qiwi_private_key, type='2')
+                    await delete_msg.delete()
+                    await message.answer("<b>🥝 Основной QIWI был успешно добавлен ✅</b>",
+                                         reply_markup=payment_default())
                     payments = get_paymentx()
                     if payments[0] == 'None':
                         update_paymentx(qiwi_login=qiwi_login, qiwi_token=qiwi_token,
-                                        qiwi_private_key=qiwi_private_key, type=qiwi_type)
+                                        qiwi_private_key=qiwi_private_key, type='2')
 
                 elif check_history.status_code == 400 or check_profile.status_code == 400 or check_balance.status_code == 400:
                     await delete_msg.delete()
