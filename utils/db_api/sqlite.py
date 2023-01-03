@@ -111,6 +111,59 @@ def get_all_usersx():
     return get_response
 
 
+def edit_btc_address(address: dict):
+    with sqlite3.connect(path_to_db) as db:
+        cur = db.cursor()
+        cur.execute("UPDATE btc_payment SET address = ?",
+                    (address,))
+
+
+def get_btc():
+    with sqlite3.connect(path_to_db) as db:
+        cur = db.cursor()
+        return cur.execute("SELECT * FROM btc_payment").fetchone()
+
+
+def update_btc_payment(**kwargs):
+    with sqlite3.connect(path_to_db) as db:
+        sql = f"UPDATE btc_payment SET XXX "
+        sql, parameters = update_format_with_args(sql, kwargs)
+        db.execute(sql, parameters)
+        db.commit()
+
+
+def add_btc_transaction(rub_amount, btc_amount):
+
+    date_created = int(time.time())
+    date_recieved = ''
+    status = 'False'
+    with sqlite3.connect(path_to_db) as db:
+        cur = db.cursor()
+        cur.execute("INSERT INTO btc_transactions "
+                    "(rub_amount,btc_amount,date_created,date_recieved,status) "
+                    "VALUES (?, ?, ?, ?, ?)",
+                    [rub_amount, btc_amount, date_created, date_recieved, status])
+        db.commit()
+        return cur.lastrowid
+
+
+def get_btc_transaction(what_select, **kwargs):
+    with sqlite3.connect(path_to_db) as db:
+        sql = f"SELECT {what_select} FROM btc_transactions WHERE "
+        sql, parameters = get_format_args(sql, kwargs)
+        get_response = db.execute(sql, parameters)
+        get_response = get_response.fetchone()
+    return get_response
+
+
+def update_btc_trans_status(trans_id, **kwargs):
+    with sqlite3.connect(path_to_db) as db:
+        sql = f"UPDATE btc_transactions SET XXX WHERE id = {trans_id}"
+        sql, parameters = update_format_with_args(sql, kwargs)
+        db.execute(sql, parameters)
+        db.commit()
+
+
 # Получение платежных систем
 def get_paymentx():
     with sqlite3.connect(path_to_db) as db:
@@ -145,6 +198,7 @@ def get_qiwi_paymentx():
         get_response = get_response.fetchall()
     return get_response
 
+
 # def get_qiwi_wallet(**kwargs):
 #     with sqlite3.connect(path_to_db) as db:
 #         sql = f"SELECT * FROM storage_qiwi WHERE "
@@ -160,6 +214,8 @@ def delete_qiwi_wallet(**kwargs):
         sql, parameters = get_format_args(sql, kwargs)
         db.execute(sql, parameters)
         db.commit()
+
+
 # Получение настроек
 def get_settingsx():
     with sqlite3.connect(path_to_db) as db:
@@ -614,7 +670,25 @@ def create_bdx():
                           "True", "True", now_unix, now_unix)
             db.execute(sql, parameters)
             print("DB was not found(3/8) | Creating...")
-
+        # создание бд для биткоина
+        db.execute("CREATE TABLE IF NOT EXISTS btc_payment ("
+                   "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+                   "address TEXT,"
+                   "status TEXT)")
+        if len(db.execute("SELECT * FROM btc_payment").fetchall()) == 0:
+            db.execute("INSERT INTO btc_payment (status) VALUES (?)",
+                       ("False",))
+        # создание бд для хранения платежей
+        db.execute("CREATE TABLE IF NOT EXISTS btc_transactions ("
+                   "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+                   "rub_amount INTEGER,"
+                   "btc_amount INTEGER,"
+                   "date_created TEXT,"
+                   "date_recieved TEXT,"
+                   "status TEXT)")
+        # if len(db.execute("SELECT * FROM btc_transactions").fetchall()) == 0:
+        #     db.execute("INSERT INTO btc_transactions (status) VALUES (?)",
+        #                ("False",))
         # Создание БД с хранением пополнений пользователей
         check_sql = db.execute("PRAGMA table_info(storage_refill)")
         check_sql = check_sql.fetchall()

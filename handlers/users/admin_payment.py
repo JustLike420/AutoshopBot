@@ -13,9 +13,10 @@ from filters import IsAdmin
 from keyboards.default import payment_default
 from keyboards.inline import choice_way_input_payment_func
 from loader import dp, bot
-from states import StorageQiwi
+from states import StorageQiwi, StorageBTC
 from utils import send_all_admin, clear_firstname
-from utils.db_api.sqlite import get_paymentx, update_paymentx, add_qiwi_payment, get_qiwi_paymentx, delete_qiwi_wallet
+from utils.db_api.sqlite import get_paymentx, update_paymentx, add_qiwi_payment, get_qiwi_paymentx, delete_qiwi_wallet, \
+    get_btc, edit_btc_address, update_btc_payment
 from utils.other_func import validation, withdraw
 
 
@@ -90,6 +91,7 @@ async def change_qiwi_login(message: types.Message, state: FSMContext):
     await message.answer("<b>🥝 Введите</b> <code>логин(номер)</code> <b>QIWI кошелька 2️⃣</b>")
     await StorageQiwi.here_input_qiwi_login.set()
 
+
 @dp.message_handler(IsAdmin(), text="🥝 Добавить QIWI 1", state="*")
 async def change_qiwi_login1(message: types.Message, state: FSMContext):
     await state.finish()
@@ -104,6 +106,8 @@ async def change_qiwi__login1(message: types.Message, state: FSMContext):
     add_qiwi_payment(qiwi_login=number, qiwi_token='',
                      qiwi_private_key='', type='1')
     await state.finish()
+
+
 # Проверка работоспособности QIWI
 @dp.message_handler(IsAdmin(), text="🥝 Проверить QIWI ♻", state="*")
 async def check_qiwi(message: types.Message, state: FSMContext):
@@ -337,3 +341,45 @@ async def change_key_api(message: types.Message, state: FSMContext):
     wallet_login = str(message.text)
     delete_qiwi_wallet(qiwi_login=wallet_login)
     await message.answer(f"{wallet_login} Удален.")
+
+
+#  BTC
+
+
+@dp.message_handler(IsAdmin(), text="🔴 Выключить пополнения btc", state="*")
+async def turn_off_btc(message: types.Message, state: FSMContext):
+    await state.finish()
+    update_btc_payment(status="False")
+    await message.answer("<b>🔴 Пополнения btc в боте были выключены.</b>",
+                         reply_markup=payment_default())
+    await send_all_admin(
+        f"👤 Администратор <a href='tg://user?id={message.from_user.id}'>{clear_firstname(message.from_user.first_name)}</a>\n"
+        "🔴 Выключил пополнения btc в боте.", not_me=message.from_user.id)
+
+
+# Выключение пополнения
+@dp.message_handler(IsAdmin(), text="🟢 Включить пополнения btc", state="*")
+async def turn_on_btc(message: types.Message, state: FSMContext):
+    await state.finish()
+    update_btc_payment(status="True")
+    await message.answer("<b>🟢 Пополнения btc в боте были включены.</b>",
+                         reply_markup=payment_default())
+    await send_all_admin(
+        f"👤 Администратор <a href='tg://user?id={message.from_user.id}'>{clear_firstname(message.from_user.first_name)}</a>\n"
+        "🟢 Включил пополнения btc в боте.", not_me=message.from_user.id)
+
+
+@dp.message_handler(IsAdmin(), text="Изменить btc 🖍", state="*")
+async def change_btc(message: types.Message):
+    btc_address = get_btc()
+    await message.answer(f"Текущий адрес: {btc_address[1]}\n"
+                         "Введите новый btc address")
+    await StorageBTC.address.set()
+
+
+@dp.message_handler(state=StorageBTC.address)
+async def input_btc_address(message: types.Message, state: FSMContext):
+    address = message.text
+    edit_btc_address(address)
+    await message.answer("Кошелек изменен")
+    await state.finish()

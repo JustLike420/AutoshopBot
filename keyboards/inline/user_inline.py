@@ -3,7 +3,7 @@ from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 # Кнопки при поиске профиля через админ-меню
 open_profile_inl = InlineKeyboardMarkup()
-input_kb = InlineKeyboardButton(text="💵 Пополнить", callback_data="user_input")
+input_kb = InlineKeyboardButton(text="💵 Пополнить", callback_data="user_input_payment")
 mybuy_kb = InlineKeyboardButton(text="🛒 Мои покупки", callback_data="my_buy")
 open_profile_inl.add(input_kb, mybuy_kb)
 

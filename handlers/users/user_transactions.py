@@ -12,15 +12,28 @@ from pyqiwip2p import QiwiP2P
 from keyboards.default import all_back_to_main_default, check_user_out_func
 from keyboards.inline import *
 from loader import dp, bot
-from states.state_payment import StorageQiwi
-from utils import send_all_admin, clear_firstname, get_dates
-from utils.db_api.sqlite import update_userx, get_refillx, add_refillx, get_qiwi_paymentx, update_paymentx
+from states.state_payment import StorageQiwi, StorageBTC
+from utils import send_all_admin, clear_firstname, get_dates, check_btc_amount
+from utils.btc_payment import BitcoinPay
+from utils.db_api.sqlite import update_userx, get_refillx, add_refillx, get_qiwi_paymentx, update_paymentx, get_btc, \
+    add_btc_transaction, get_btc_transaction, update_btc_trans_status
+
+
+@dp.callback_query_handler(text="user_input_payment", state="*")
+async def input_payment(call: CallbackQuery):
+    await bot.delete_message(call.from_user.id, call.message.message_id)
+    markup = InlineKeyboardMarkup()
+    markup.add(InlineKeyboardButton(text="Qiwi", callback_data="qiwi_paym"))
+    markup.add(InlineKeyboardButton(text="Btc",
+                                    callback_data="btc_paym"))
+    await call.message.answer("<b>Выбери способ оплаты:</b>",
+                              reply_markup=markup)
 
 
 ###################################################################################
 ############################## ВВОД СУММЫ ПОПОЛНЕНИЯ ##############################
 # Выбор способа пополнения
-@dp.callback_query_handler(text="user_input", state="*")
+@dp.callback_query_handler(text="qiwi_paym", state="*")
 async def input_amount(call: CallbackQuery, state: FSMContext):
     check_pass = False
     get_payment = get_paymentx()
@@ -302,3 +315,103 @@ async def check_qiwi_pay(call: CallbackQuery):
         await bot.answer_callback_query(call.id, "❗ Извиняемся за доставленные неудобства,\n"
                                                  "проверка платежа временно недоступна.\n"
                                                  "⏳ Попробуйте чуть позже.")
+
+
+# btc
+
+@dp.callback_query_handler(text="btc_paym", state="*")
+async def input_amount_btc(call: CallbackQuery, state: FSMContext):
+    get_payment = get_btc()
+    if get_payment[2] == "True":
+        await StorageBTC.btc_amount.set()
+        await bot.delete_message(call.from_user.id, call.message.message_id)
+        await call.message.answer("<b>💵 Введите сумму для пополнения средств в рублях</b>",
+                                  reply_markup=all_back_to_main_default)
+
+    else:
+        await bot.answer_callback_query(call.id, "❗ Пополнение временно недоступно")
+        await send_all_admin(
+            f"👤 Пользователь <a href='tg://user?id={call.from_user.id}'>{clear_firstname(call.from_user.first_name)}</a> "
+            f"пытался пополнить баланс через btc.")
+
+
+@dp.message_handler(state=StorageBTC.btc_amount)
+async def create_btc_pay(message: types.Message, state: FSMContext):
+    if message.text.isdigit():
+        amount = int(message.text)
+        del_msg = await bot.send_message(message.from_user.id, "<b>♻ Подождите, платёж генерируется...</b>")
+        address = get_btc()[1]
+        payer = BitcoinPay(rub_amount=amount, address=address)
+        payer.get_rate()
+        payer.get_amount_to_pay()
+        pay_btc = payer.amount_to_pay
+        pay_address = payer.get_address()
+
+        while True:
+            if check_btc_amount(pay_btc):
+                pay_btc += 0.00000001
+                pay_btc = round(pay_btc, 8)
+            else:
+                break
+        payer.amount_to_pay = pay_btc
+        payment_id = add_btc_transaction(amount, pay_btc)
+        await bot.delete_message(message.chat.id, del_msg.message_id)
+        delete_msg = await message.answer("🥝 <b>Платёж был создан.</b>",
+                                          reply_markup=check_user_out_func(message.from_user.id))
+        send_message = "❗️ Для оплаты <b>необходимо оплатить точную сумму в BTC</b>️ ❗️\n" \
+                       f"<b>Оплатить: <code>{pay_btc}</code></b>\n" \
+                       f"По адресу: <code>{pay_address}</code>\n" \
+                       f"Если возникли проблемы, пиши в поддержку"
+        await message.answer(send_message,
+                             reply_markup=create_pay_btc_func(payment_id,
+                                                              message_id=delete_msg.message_id, way='btc'))
+        await state.finish()
+    else:
+        await StorageBTC.btc_amount.set()
+        await message.answer("<b>❌ Данные были введены неверно.</b>\n"
+                             "💵 Введите сумму для пополнения средств")
+
+
+@dp.callback_query_handler(text_startswith="Pay:btc:")
+async def check_btc_pay(call: CallbackQuery):
+    payment_id = call.data.split(":")[2]
+    message_id = call.data.split(":")[3]
+    payment = get_btc_transaction('*', id=payment_id)
+    rub = payment[1]
+    btc = payment[2]
+    time_start = payment[3]
+    address = get_btc()[1]
+    b = BitcoinPay(rub, btc, address)
+    data = b.get_trans()
+    success = False
+
+    for tx in data['list']:
+        block_time = tx['block_time'] + 3 * 3600
+        if block_time >= int(time_start):
+            for out in tx['outputs']:
+                if out['addresses'][0] == b.get_address() and out['value'] == b.get_satoshi(btc):
+                    success = True
+
+    if success:
+        get_user_info = get_userx(user_id=call.from_user.id)
+        await bot.delete_message(call.message.chat.id, message_id)
+        await call.message.delete()
+        amount = rub  # сумма пополнения
+
+        add_refillx(call.from_user.id, call.from_user.username, call.from_user.first_name, 'btc',
+                    amount, time_start, "btc", get_dates(),
+                    int(time.time()))
+        update_userx(call.from_user.id,
+                     balance=int(get_user_info[4]) + amount,
+                     all_refill=int(get_user_info[5]) + amount)
+        update_btc_trans_status(payment_id, status='True', date_recieved=int(time.time()))
+        await call.message.answer(f"<b>✅ Вы успешно пополнили баланс на сумму {amount}руб Удачи ❤</b>\n"
+                                  f"<b>📃 Чек:</b> <code>{time_start}</code>",
+                                  reply_markup=check_user_out_func(call.from_user.id))
+        await send_all_admin(f"<b>💰 Пользователь</b> "
+                             f"(@{call.from_user.username}|<a href='tg://user?id={call.from_user.id}'>{call.from_user.first_name}</a>"
+                             f"|<code>{call.from_user.id}</code>) "
+                             f"<b>пополнил баланс на сумму</b> <code>{amount}руб</code> 🥝\n"
+                             f"📃 <b>Чек:</b> <code>{time_start}</code>")
+    else:
+        await call.answer("Платеж не найден.")

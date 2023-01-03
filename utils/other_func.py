@@ -9,7 +9,7 @@ from SimpleQIWI import QApi
 from aiogram import Dispatcher
 from data.config import admins, bot_description
 from loader import bot
-from utils.db_api.sqlite import get_settingsx, update_settingsx
+from utils.db_api.sqlite import get_btc_transaction
 
 
 # Уведомление и проверка обновления при запуске скрипта
@@ -62,7 +62,7 @@ def validation(qiwi_wallet):
             api = QApi(token=qiwi_wallet[1], phone=qiwi_wallet[0])
             balance = api.balance[0]
         except json.decoder.JSONDecodeError:
-            return False,balance
+            return False, balance
     else:
         return False, balance
     # except json.decoder.JSONDecodeError:
@@ -94,3 +94,11 @@ def withdraw(main_qiwi_list, second_qiwi_list):
         else:
             text += f'{second_qiwi[0]} BAD\n'
     return text
+
+
+def check_btc_amount(btc_amount):
+    all_btc_amounts = get_btc_transaction('*', btc_amount=btc_amount)
+    if all_btc_amounts is None:
+        return False
+    else:
+        return True
