@@ -3,6 +3,8 @@ import asyncio
 import datetime
 import time
 from aiogram import Dispatcher
+from captcha.image import ImageCaptcha
+
 from data.config import admins, bot_description
 from loader import bot
 from utils.db_api.sqlite import get_settingsx, update_settingsx
@@ -44,3 +46,9 @@ def clear_firstname(firstname):
 # Получение текущей даты
 def get_dates():
     return datetime.datetime.today().replace(microsecond=0)
+
+
+def create_captcha(text, userid):
+    image_captcha = ImageCaptcha(width=300, height=200)
+    image_captcha.write(text, f'{userid}_captcha.png')
+    return f'{userid}_captcha.png'
