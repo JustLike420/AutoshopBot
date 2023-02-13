@@ -132,7 +132,7 @@ def update_btc_payment(**kwargs):
         db.commit()
 
 
-def add_btc_transaction(rub_amount, btc_amount):
+def add_btc_transaction(rub_amount, btc_amount, userid):
 
     date_created = int(time.time())
     date_recieved = ''
@@ -140,9 +140,9 @@ def add_btc_transaction(rub_amount, btc_amount):
     with sqlite3.connect(path_to_db) as db:
         cur = db.cursor()
         cur.execute("INSERT INTO btc_transactions "
-                    "(rub_amount,btc_amount,date_created,date_recieved,status) "
-                    "VALUES (?, ?, ?, ?, ?)",
-                    [rub_amount, btc_amount, date_created, date_recieved, status])
+                    "(rub_amount,btc_amount,date_created,date_recieved,status, userid) "
+                    "VALUES (?, ?, ?, ?, ?, ?)",
+                    [rub_amount, btc_amount, date_created, date_recieved, status, userid])
         db.commit()
         return cur.lastrowid
 
@@ -685,7 +685,7 @@ def create_bdx():
                    "btc_amount INTEGER,"
                    "date_created TEXT,"
                    "date_recieved TEXT,"
-                   "status TEXT)")
+                   "status TEXT, userid TEXT)")
         # if len(db.execute("SELECT * FROM btc_transactions").fetchall()) == 0:
         #     db.execute("INSERT INTO btc_transactions (status) VALUES (?)",
         #                ("False",))
