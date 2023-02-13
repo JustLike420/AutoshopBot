@@ -1109,10 +1109,12 @@ def buy_item_item_position_ap(remover, category_id):
     x = 0
     keyboard = InlineKeyboardMarkup()
     get_positions = get_positionsx("*", category_id=category_id)
+    get_positions = sorted(get_positions, key=lambda x: x[3])
     for a in range(remover, len(get_positions)):
         if x < count_page:
             get_items = get_itemsx("*", position_id=get_positions[a][1])
-            keyboard.add(InlineKeyboardButton(f"{get_positions[a][2]} | {get_positions[a][3]}руб | {len(get_items)}шт",
+            if len(get_items) != 0:
+                keyboard.add(InlineKeyboardButton(f"{get_positions[a][2]} | {get_positions[a][3]}руб | {len(get_items)}шт",
                                               callback_data=f"buy_open_position:{get_positions[a][1]}:{remover}:{category_id}"))
         x += 1
     if len(get_positions) <= 10:
@@ -1144,10 +1146,12 @@ def item_buy_next_page_position_ap(remover, category_id):
     x = 0
     keyboard = InlineKeyboardMarkup()
     get_positions = get_positionsx("*", category_id=category_id)
+    get_positions = sorted(get_positions, key=lambda x: x[3])
     for a in range(remover, len(get_positions)):
         if x < count_page:
             get_items = get_itemsx("*", position_id=get_positions[a][1])
-            keyboard.add(InlineKeyboardButton(f"{get_positions[a][2]} | {get_positions[a][3]}руб | {len(get_items)}шт",
+            if len(get_items) != 0:
+                keyboard.add(InlineKeyboardButton(f"{get_positions[a][2]} | {get_positions[a][3]}руб | {len(get_items)}шт",
                                               callback_data=f"buy_open_position:{get_positions[a][1]}:{remover}:{category_id}"))
         x += 1
     if remover + count_page >= len(get_positions):
@@ -1172,10 +1176,13 @@ def item_buy_previous_page_position_ap(remover, category_id):
     x = 0
     keyboard = InlineKeyboardMarkup()
     get_positions = get_positionsx("*", category_id=category_id)
+    get_positions = sorted(get_positions, key=lambda x: x[3])
     for a in range(remover, len(get_positions)):
         if x < count_page:
+
             get_items = get_itemsx("*", position_id=get_positions[a][1])
-            keyboard.add(InlineKeyboardButton(f"{get_positions[a][2]} | {get_positions[a][3]}руб | {len(get_items)}шт",
+            if len(get_items) != 0:
+                keyboard.add(InlineKeyboardButton(f"{get_positions[a][2]} | {get_positions[a][3]}руб | {len(get_items)}шт",
                                               callback_data=f"buy_open_position:{get_positions[a][1]}:{remover}:{category_id}"))
         x += 1
     if remover <= 0:
