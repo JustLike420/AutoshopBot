@@ -354,12 +354,13 @@ async def create_btc_pay(message: types.Message, state: FSMContext):
             else:
                 break
         payer.amount_to_pay = pay_btc
-        payment_id = add_btc_transaction(amount, pay_btc)
+
+        payment_id = add_btc_transaction(amount, pay_btc, message.from_user.id)
         await bot.delete_message(message.chat.id, del_msg.message_id)
         delete_msg = await message.answer("🥝 <b>Платёж был создан.</b>",
                                           reply_markup=check_user_out_func(message.from_user.id))
         send_message = "❗️ Для оплаты <b>необходимо оплатить точную сумму в BTC</b>️ ❗️\n" \
-                       f"<b>Оплатить: <code>{pay_btc}</code></b>\n" \
+                       f"<b>Оплатить: <code>{'{:.8f}'.format(pay_btc)}</code></b>\n" \
                        f"По адресу: <code>{pay_address}</code>\n" \
                        f"Если возникли проблемы, пиши в поддержку"
         await message.answer(send_message,
@@ -384,14 +385,15 @@ async def check_btc_pay(call: CallbackQuery):
     b = BitcoinPay(rub, btc, address)
     data = b.get_trans()
     success = False
-
-    for tx in data['list']:
-        block_time = tx['block_time'] + 3 * 3600
-        if block_time >= int(time_start):
-            for out in tx['outputs']:
-                if out['addresses'][0] == b.get_address() and out['value'] == b.get_satoshi(btc):
-                    success = True
-
+    try:
+        for tx in data['list']:
+            block_time = tx['block_time'] + 3 * 3600
+            if block_time >= int(time_start):
+                for out in tx['outputs']:
+                    if out['addresses'][0] == b.get_address() and out['value'] == b.get_satoshi(btc):
+                        success = True
+    except:
+        pass
     if success:
         get_user_info = get_userx(user_id=call.from_user.id)
         await bot.delete_message(call.message.chat.id, message_id)
