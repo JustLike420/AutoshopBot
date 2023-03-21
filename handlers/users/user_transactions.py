@@ -386,11 +386,11 @@ async def check_btc_pay(call: CallbackQuery):
     data = b.get_trans()
     success = False
     try:
-        for tx in data['list']:
-            block_time = tx['block_time'] + 3 * 3600
+        for tx in data['txs']:
+            block_time = tx['time'] + 3 * 3600
             if block_time >= int(time_start):
-                for out in tx['outputs']:
-                    if out['addresses'][0] == b.get_address() and out['value'] == b.get_satoshi(btc):
+                for out in tx['out']:
+                    if out['addr'] == b.get_address() and out['value'] == b.get_satoshi(btc):
                         success = True
     except:
         pass

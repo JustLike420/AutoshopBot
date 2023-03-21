@@ -29,7 +29,7 @@ class BitcoinPay:
     def get_trans(self):
         """получение всех транзакций кошелька"""
         url = f'https://chain.api.btc.com/v3/address/{self._address}/tx'
-        data = requests.get(url).json()['data']
+        data = requests.get(url).json()
         return data
 
     @staticmethod
