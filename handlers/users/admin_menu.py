@@ -3,7 +3,8 @@ from aiogram import types
 from aiogram.dispatcher import FSMContext
 
 from filters import IsAdmin
-from keyboards.default import get_settings_func, payment_default, get_functions_func, items_default, admins
+from keyboards.default import get_settings_func, payment_default, get_functions_func, items_default, \
+    admins
 from keyboards.inline import choice_way_input_payment_func
 from loader import dp, bot
 from utils import get_dates
@@ -20,13 +21,6 @@ def split_messages(get_list, count):
 async def payments_systems(message: types.Message, state: FSMContext):
     await state.finish()
     await message.answer("🔑 Настройка платежных системы.", reply_markup=payment_default())
-    await message.answer("🥝 Выберите способ пополнения 💵\n"
-                         "➖➖➖➖➖➖➖➖➖➖➖➖➖\n"
-                         "🔸 <a href='https://vk.cc/bYjKGM'><b>По форме</b></a> - <code>Готовая форма оплаты QIWI</code>\n"
-                         "🔸 <a href='https://vk.cc/bYjKEy'><b>По номеру</b></a> - <code>Перевод средств по номеру телефона</code>\n"
-                         "🔸 <a href='https://vk.cc/bYjKJk'><b>По никнейму</b></a> - "
-                         "<code>Перевод средств по никнейму (пользователям придётся вручную вводить комментарий)</code>",
-                         reply_markup=choice_way_input_payment_func())
 
 
 # Обработка кнопки "Настройки бота"
@@ -40,7 +34,8 @@ async def settings_bot(message: types.Message, state: FSMContext):
 @dp.message_handler(IsAdmin(), text="🔆 Общие функции", state="*")
 async def general_functions(message: types.Message, state: FSMContext):
     await state.finish()
-    await message.answer("🔆 Выберите нужную функцию.", reply_markup=get_functions_func(message.from_user.id))
+    await message.answer("🔆 Выберите нужную функцию.",
+                         reply_markup=get_functions_func(message.from_user.id))
 
 
 # Обработка кнопки "Общие функции"

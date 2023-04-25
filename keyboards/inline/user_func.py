@@ -1,6 +1,7 @@
 # - *- coding: utf- 8 - *-
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
+
 # Проверка оплаты киви
 def create_pay_qiwi_func(send_requests, receipt, message_id, way):
     check_qiwi_pay_inl = InlineKeyboardMarkup()
@@ -9,19 +10,22 @@ def create_pay_qiwi_func(send_requests, receipt, message_id, way):
                                                 callback_data=f"Pay:{way}:{receipt}:{message_id}"))
     return check_qiwi_pay_inl
 
+
 def create_pay_yoo_func(send_requests, receipt, message_id, way):
     check_yoo_pay_inl = InlineKeyboardMarkup()
     check_yoo_pay_inl.add(InlineKeyboardButton(text="🌀 Перейти к оплате", url=send_requests))
     check_yoo_pay_inl.add(InlineKeyboardButton(text="🔄 Проверить оплату",
-                                                callback_data=f"Pay:{way}:{receipt}:{message_id}"))
+                                               callback_data=f"Pay:{way}:{receipt}:{message_id}"))
     return check_yoo_pay_inl
+
 
 def create_pay_crystal_func(send_requests, receipt, message_id, way):
     check_crystal_pay_inl = InlineKeyboardMarkup()
     check_crystal_pay_inl.add(InlineKeyboardButton(text="🌀 Перейти к оплате", url=send_requests))
     check_crystal_pay_inl.add(InlineKeyboardButton(text="🔄 Проверить оплату",
-                                                callback_data=f"Pay:{way}:{receipt}:{message_id}"))
+                                                   callback_data=f"Pay:{way}:{receipt}:{message_id}"))
     return check_crystal_pay_inl
+
 
 # Кнопки при открытии самого товара
 def open_item_func(position_id, remover, category_id):
@@ -42,3 +46,42 @@ def confirm_buy_items(position_id, get_count, message_id):
                                       callback_data=f"not_buy_items:{message_id}")
     confirm_buy_item_keyboard.add(yes_buy_kb, not_buy_kb)
     return confirm_buy_item_keyboard
+
+
+def crypto_bot_currencies_kb():
+    currencies = ['USDT', 'BUSD', 'USDC', 'BTC', 'ETH', 'TON', 'BNB']
+    markup = InlineKeyboardMarkup(row_width=3)
+    for currency in currencies:
+        markup.insert(
+            InlineKeyboardButton(
+                text=currency,
+                callback_data=f'crypto_bot_currency|{currency}'
+            )
+        )
+    markup.add(
+        InlineKeyboardButton(
+            text='❌ Отменить действие',
+            callback_data='cancel'
+        )
+    )
+    return markup
+
+
+def check_crypto_bot_kb(url: str, invoice_hash: int):
+    markup = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text='🔗 Оплатить',
+                    url=url
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text='♻️ Проверить оплату',
+                    callback_data=f'check_crypto_bot|{invoice_hash}'
+                )
+            ]
+        ]
+    )
+    return markup

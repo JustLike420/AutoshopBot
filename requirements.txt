@@ -1,5 +1,6 @@
-aiogram
+aiogram~=2.25.1
 bs4
-pyQiwiP2P
-requests
+pyQiwiP2P~=2.0.6
+requests~=2.28.2
 yoomoney
+aiocryptopay~=0.2.6
