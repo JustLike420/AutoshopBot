@@ -9,11 +9,11 @@ from aiogram.dispatcher import FSMContext
 from aiogram.types import CallbackQuery
 from pyqiwip2p import QiwiP2P
 
+from external.pycrystalpay import CrystalPAY, InvoiceType
 from keyboards.default import all_back_to_main_default, check_user_out_func
 from keyboards.inline import *
 from loader import dp, bot
 from states.state_payment import StorageQiwi, StorageYooMoney, StorageCrystalPay
-from external.pycrystalpay import CrystalPay
 from utils import send_all_admin, clear_firstname, get_dates
 from utils.db_api.sqlite import update_userx, get_refillx, add_refillx, get_yoomoney, get_crystal
 
@@ -183,19 +183,17 @@ async def input_amount_yoo(call: CallbackQuery, state: FSMContext):
 @dp.message_handler(state=StorageCrystalPay.here_input_crystal_amount)
 async def create_crystal_pay(message: types.Message, state: FSMContext):
     if message.text.isdigit() and int(message.text) >= 2:
-        amount = int(message.text)
         crystal_data = get_crystal()
-        print(crystal_data)
         del_msg = await bot.send_message(message.from_user.id, "<b>♻ Подождите, платёж генерируется...</b>")
-        crystal = CrystalPay(crystal_data[1], crystal_data[2])
-        link = crystal.generate_pay_link(message.text)
+        crystal = CrystalPAY(crystal_data[1], crystal_data[2], '')
+        link = crystal.Invoice.create(int(message.text), InvoiceType.purchase, 100)
         await bot.delete_message(message.chat.id, del_msg.message_id)
         delete_msg = await message.answer("🥝 <b>Платёж был создан.</b>",
                                           reply_markup=check_user_out_func(message.from_user.id))
         await message.answer("🎈 Ссылка на оплату сгенерирована:\n"
-                             f"✔ ID платежа: {link[0]}\n"
-                             f"📎 Ссылка: <a href='{link[1]}'>нажмите для пополнения счёта</a>",
-                             reply_markup=create_pay_crystal_func(send_requests=link[1], receipt=link[0],
+                             f"✔ ID платежа: {link['id']}\n"
+                             f"📎 Ссылка: <a href='{link['url']}'>нажмите для пополнения счёта</a>",
+                             reply_markup=create_pay_crystal_func(send_requests=link['url'], receipt=link['id'],
                                                                   message_id=message.message_id, way="Crystal"))
         await state.finish()
     else:
@@ -211,13 +209,13 @@ async def check_crystal_pay(call: CallbackQuery):
     message_id = call_data[3]
     way_pay = call_data[1]
     crystal_data = get_crystal()
-    crystal = CrystalPay(crystal_data[1], crystal_data[2])
-    status = crystal.get_pay_status(receipt)
-    pay_amount = status[1]
+    crystal = CrystalPAY(crystal_data[1], crystal_data[2], '')
+    status = crystal.Invoice.getinfo(receipt)
+    pay_amount = status['amount']
     # get_payments = get_paymentx()
     get_user_info = get_userx(user_id=call.from_user.id)
-    pay_status = status[0]
-    if pay_status:
+    pay_status = status['state']
+    if pay_status == 'payed':
         get_purchase = get_refillx("*", receipt=receipt)
         if get_purchase is None:
             add_refillx(call.from_user.id, call.from_user.username, call.from_user.first_name, receipt,

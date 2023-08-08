@@ -1,121 +1,313 @@
-# - *- coding: utf- 8 - *-
-from requests import get
-from json import loads
-
-__base_url__ = "https://api.crystalpay.ru/v1/"
+import requests
+import json
+import hashlib
 
 
-class CrystalPay:
-    """ Управление кассой платежной системы crystal pay
+class InvoiceType:
+    topup = "topup"
+    purchase = "purchase"
 
-    Данная библиотека позволит Вам встраивать платежную систему crystal pay в Ваш код без особых усилий.
 
-    """
+class PayoffSubtractFrom:
+    balance = "balance"
+    amount = "amount"
 
-    def __init__(self, login, secret_1):
 
-        """ Функция для  получения данных для работы с кассой.
+class crystal_utils:
+    ''' Дополнительный класс, содержащий в себе дополнительные функции для работы SDK '''
 
-        Аргументы :
-            login - логин кассы.
-            secret_1 - первый секретный ключ, требуется для базовых функиця кассы.
+    ''' Соединяет необязательные параметры с обязательными '''
 
-        """
+    def concatParams(self, concatList, kwargs):
 
-        self.crystal_login = login
-        self.crystal_secret_1 = secret_1
+        temp = concatList
 
-        self.validate_date()
+        for key, param in kwargs:
+            temp[key] = param
 
-    def get_balance(self):
+        return temp
 
-        """ Функция для получения баланса кассы.
+    ''' Отправка запроса на API '''
 
-        Аргументы :
-            нет
-        Возвращает :
-            dict - словарь кошельков и их балансов.
+    def requestsApi(self, method, function, params):
 
-        """
+        response = json.loads(
+            requests.post(
+                f"https://api.crystalpay.io/v2/{method}/{function}/",
+                data=params,
+                headers={'Content-Type': 'application/json'}
+            ).text
+        )
 
-        answer_from_host = loads(get(__base_url__ + '?s={}&n={}&o=balance' \
-                                     .format(self.crystal_secret_1, self.crystal_login)).text)
+        if (response["error"]):
+            raise Exception(response['errors'])
 
-        return answer_from_host['balance']
+        ''' Убираем из JSON ответа сообщения об ошибках '''
 
-    def generate_pay_link(self, amount, redirect=None):
+        del response["error"]
+        del response["errors"]
 
-        """ Функция генерации ссылки для оплаты.
+        return response
 
-        Аргументы :
-            amount - сумма оплаты
-        Возвращает:
-            list - id платежа, ссылка для оплаты
 
-        """
+class CrystalPAY:
+    ''' Гланый класс для работы с CrystalApi '''
 
-        if not redirect:
+    def __init__(self, auth_login, auth_secret, salt):
+        ''' Создание подклассов '''
 
-            answer_from_host = loads(get(__base_url__ + '?s={}' \
-                                                        '&n={}&o=receipt-create&amount={}'.format(self.crystal_secret_1,
-                                                                                                  self.crystal_login,
-                                                                                                  amount)).text)
-        else:
+        self.Me = self.Me(auth_login, auth_secret, crystal_utils())
+        self.Method = self.Method(auth_login, auth_secret, crystal_utils())
+        self.Balance = self.Balance(auth_login, auth_secret, crystal_utils())
+        self.Invoice = self.Invoice(auth_login, auth_secret, crystal_utils())
+        self.Payoff = self.Payoff(auth_login, auth_secret, salt, crystal_utils())
+        self.Ticker = self.Ticker(auth_login, auth_secret, crystal_utils())
 
-            answer_from_host = loads(get(__base_url__ + '?s={}' \
-                                                        '&n={}&o=receipt-create&amount={}&redirect={}'.format(
-                self.crystal_secret_1,
-                self.crystal_login, amount,
-                redirect)).text)
+    class Me:
 
-        return answer_from_host['id'], answer_from_host['url']
+        def __init__(self, auth_login, auth_secret, crystal_utils):
+            self.__auth_login = auth_login
+            self.__auth_secret = auth_secret
+            self.__crystal_utils = crystal_utils
 
-    def validate_date(self):
+        ''' Получение информации о кассе '''
 
-        """ Функция для проверки данных на правильность.
+        def getinfo(self):
+            response = self.__crystal_utils.requestsApi(
+                "me",
+                "info",
+                json.dumps({
+                    "auth_login": self.__auth_login,
+                    "auth_secret": self.__auth_secret
+                })
+            )
 
-        Аргументы :
-            нет
-        Возвращает :
-            True - получилось проверить баланс кассы.
-            ValueError - не получилось проверить баланс кассы.
+            return response
 
-        """
+    class Method:
 
-        answer_from_host = get(__base_url__ + '?s={}&n={}&o=balance' \
-                               .format(self.crystal_secret_1, self.crystal_login, )).text
-        if answer_from_host == '{"auth":"error"}':
-            raise ValueError('Не получилось зайти в кассу, проверьте данные!')
+        def __init__(self, auth_login, auth_secret, crystal_utils):
+            self.__auth_login = auth_login
+            self.__auth_secret = auth_secret
+            self.__crystal_utils = crystal_utils
 
-    def get_pay_status(self, pay_id):
+        ''' Получение информации о методах оплаты '''
 
-        """ Функция для получения статуса платежа.
+        def getlist(self):
+            response = self.__crystal_utils.requestsApi(
+                "method",
+                "list",
+                json.dumps({
+                    "auth_login": self.__auth_login,
+                    "auth_secret": self.__auth_secret
+                })
+            )
 
-        Аргументы :
-            pay_id - id платежа
-        Возвращает :
-            bool - True, если платеж прошел, в ином случае False
-            int - сумма платежа
+            return response
 
-        """
+        ''' Изменение настроек метода оплаты '''
 
-        answer_from_host = loads(get(__base_url__ + f'?s={self.crystal_secret_1}' \
-                                                   f'&n={self.crystal_login}&o=receipt-check&i={pay_id}').text)
-        if answer_from_host['state'] == 'payed':
-            state = True
-        else:
-            state = False
+        def edit(self, method, extra_commission_percent, enabled):
+            response = self.__crystal_utils.requestsApi(
+                "method",
+                "edit",
+                json.dumps({
+                    "auth_login": self.__auth_login,
+                    "auth_secret": self.__auth_secret,
+                    "method": method,
+                    "extra_commission_percent": extra_commission_percent,
+                    "enabled": enabled
+                })
+            )
 
-        return state, answer_from_host['amount']
+            return response
 
-    def gen_pay_link_by_id(self, pay_id):
+    class Balance:
 
-        """ Функция для генерации ссылки для оплаты, имея id платежа.
+        def __init__(self, auth_login, auth_secret, crystal_utils):
+            self.__auth_login = auth_login
+            self.__auth_secret = auth_secret
+            self.__crystal_utils = crystal_utils
 
-        Аргументы :
-            pay_id - id платежа
-        Возвращает :
-            str - ссылка для оплаты
-        """
+        ''' Получение баланса кассы '''
 
-        return 'https:\/\/pay.crystalpay.ru\/?i={}'.format(pay_id)
+        def getinfo(self, hide_empty=False):
+            response = self.__crystal_utils.requestsApi(
+                "balance",
+                "info",
+                json.dumps({
+                    "auth_login": self.__auth_login,
+                    "auth_secret": self.__auth_secret,
+                    "hide_empty": hide_empty
+                })
+            )
+
+            return response["balances"]
+
+    class Invoice:
+
+        def __init__(self, auth_login, auth_secret, crystal_utils):
+            self.__auth_login = auth_login
+            self.__auth_secret = auth_secret
+            self.__crystal_utils = crystal_utils
+
+        ''' Получение информации о счёте '''
+
+        def getinfo(self, id):
+            response = self.__crystal_utils.requestsApi(
+                "invoice",
+                "info",
+                json.dumps({
+                    "auth_login": self.__auth_login,
+                    "auth_secret": self.__auth_secret,
+                    "id": id
+                })
+            )
+
+            return response
+
+        ''' Выставление счёта на оплату '''
+
+        def create(self, amount, type_, lifetime, **kwargs):
+            response = self.__crystal_utils.requestsApi(
+                "invoice",
+                "create",
+                json.dumps(
+                    self.__crystal_utils.concatParams(
+                        {
+                            "auth_login": self.__auth_login,
+                            "auth_secret": self.__auth_secret,
+                            "amount": amount,
+                            "type": type_,
+                            "lifetime": lifetime
+                        },
+                        kwargs.items()
+                    )
+                )
+            )
+
+            return response
+
+    class Payoff:
+
+        def __init__(self, auth_login, auth_secret, salt, crystal_utils):
+            self.__auth_login = auth_login
+            self.__auth_secret = auth_secret
+            self.__salt = salt
+            self.__crystal_utils = crystal_utils
+
+        ''' Создание заявки на вывод средств '''
+
+        def create(self, amount, method, wallet, subtract_from, **kwargs):
+            signature_string = f"{amount}:{method}:{wallet}:{self.__salt}"
+            signature = hashlib.sha1(str.encode(signature_string)).hexdigest()
+
+            response = self.__crystal_utils.requestsApi(
+                "payoff",
+                "create",
+                json.dumps(
+                    self.__crystal_utils.concatParams(
+                        {
+                            "auth_login": self.__auth_login,
+                            "auth_secret": self.__auth_secret,
+                            "signature": signature,
+                            "amount": amount,
+                            "method": method,
+                            "wallet": wallet,
+                            "subtract_from": subtract_from
+                        },
+                        kwargs.items()
+                    )
+                )
+            )
+
+            return response
+
+        ''' Подтверждение заявки на вывод средств '''
+
+        def submit(self, id):
+            signature_string = f"{id}:{self.__salt}"
+            signature = hashlib.sha1(str.encode(signature_string)).hexdigest()
+
+            response = self.__crystal_utils.requestsApi(
+                "payoff",
+                "submit",
+                json.dumps({
+                    "auth_login": self.__auth_login,
+                    "auth_secret": self.__auth_secret,
+                    "signature": signature,
+                    "id": id,
+                })
+            )
+
+            return response
+
+        ''' Отмена заявки на вывод средств '''
+
+        def cancel(self, id):
+            signature_string = f"{id}:{self.__salt}"
+            signature = hashlib.sha1(str.encode(signature_string)).hexdigest()
+
+            response = self.__crystal_utils.requestsApi(
+                "payoff",
+                "cancel",
+                json.dumps({
+                    "auth_login": self.__auth_login,
+                    "auth_secret": self.__auth_secret,
+                    "signature": signature,
+                    "id": id,
+                })
+            )
+
+            return response
+
+        ''' Получение информации о заявке на вывод средств '''
+
+        def getinfo(self, id):
+            response = self.__crystal_utils.requestsApi(
+                "payoff",
+                "info",
+                json.dumps({
+                    "auth_login": self.__auth_login,
+                    "auth_secret": self.__auth_secret,
+                    "id": id,
+                })
+            )
+
+            return response
+
+    class Ticker:
+
+        def __init__(self, auth_login, auth_secret, crystal_utils):
+            self.__auth_login = auth_login
+            self.__auth_secret = auth_secret
+            self.__crystal_utils = crystal_utils
+
+        ''' Получение информации о заявке на вывод средств '''
+
+        def getlist(self):
+            response = self.__crystal_utils.requestsApi(
+                "ticker",
+                "list",
+                json.dumps({
+                    "auth_login": self.__auth_login,
+                    "auth_secret": self.__auth_secret,
+                })
+            )
+
+            return response["tickers"]
+
+        ''' Получение курса валют по отношению к рублю '''
+
+        def get(self, tickers):
+            response = self.__crystal_utils.requestsApi(
+                "ticker",
+                "get",
+                json.dumps({
+                    "auth_login": self.__auth_login,
+                    "auth_secret": self.__auth_secret,
+                    "tickers": tickers
+                })
+            )
+
+            return response
